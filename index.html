@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZetaCraft Hub // iOS & Android Edition</title>
+    
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="stylesheet" href="style-app.css">
+
+    <!-- FIREBASE COMPAT SDKs (App, Auth, Firestore) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <!-- GOOGLE RECAPTCHA API -->
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+</head>
+<body>
+
+    <!-- POP-UP BENVENUTO E GESTIONE DATI CON ACCETTA / RIFIUTA -->
+    <div id="welcome-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-glow"></div>
+            <h3 class="modal-title">⚡ ZETACRAFT V1.3</h3>
+            <p class="modal-text">
+                Benvenuto nel Network Hub! Per offrirti un'esperienza ottimale e sicura, l'app richiede l'uso del salvataggio dati locale (sessione, audio e tema).
+            </p>
+
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+                <button class="modal-btn-accept" id="modal-accept-btn">
+                    ✅ SALVA I DATI (ACCETTA)
+                </button>
+                <button class="modal-btn-reject" id="modal-reject-btn">
+                    ❌ NON SALVARE I DATI (RIFIUTA)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALE IMPOSTAZIONI PROFILO (STILE DISCORD) -->
+    <div id="profile-settings-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width: 420px; width: 90%; max-height: 85vh; overflow-y: auto;">
+            <div class="modal-glow"></div>
+            <h3 class="modal-title">⚙️ IMPOSTAZIONI PROFILO</h3>
+            <p class="modal-text" style="margin-bottom: 12px;">Personalizza il tuo profilo in stile Discord con banner, bio e preferenze.</p>
+
+            <div style="display: flex; flex-direction: column; gap: 8px; text-align: left;">
+                <label style="font-size: 10px; color: #00d4ff;">Nome Visualizzato</label>
+                <input type="text" id="edit-display-name" class="app-input" placeholder="Il tuo nome">
+
+                <label style="font-size: 10px; color: #00d4ff;">Nome Utente (@tag)</label>
+                <input type="text" id="edit-username-tag" class="app-input" placeholder="@utente">
+
+                <label style="font-size: 10px; color: #00d4ff;">Link Immagine Profilo (Avatar)</label>
+                <input type="url" id="edit-img-profile" class="app-input" placeholder="https://...">
+
+                <label style="font-size: 10px; color: #00d4ff;">Link Banner Profilo (Stile Discord)</label>
+                <input type="url" id="edit-banner-url" class="app-input" placeholder="https://... (lascia vuoto per colore casuale)">
+
+                <label style="font-size: 10px; color: #00d4ff;">Bio / Informazioni</label>
+                <textarea id="edit-bio" class="app-input" rows="2" placeholder="Raccontaci qualcosa di te..." style="resize: none; font-family: inherit;"></textarea>
+
+                <label style="font-size: 10px; color: #00d4ff;">Email</label>
+                <input type="email" id="edit-email" class="app-input" placeholder="La tua email">
+
+                <!-- CHECKBOX PRIVACY EMAIL -->
+                <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                    <input type="checkbox" id="edit-show-email" style="cursor: pointer;">
+                    <label for="edit-show-email" style="font-size: 10px; color: #ccc; cursor: pointer;">Mostra la mia email alla community</label>
+                </div>
+
+                <label style="font-size: 10px; color: #00d4ff; margin-top: 4px;">Nuova Password (lascia vuoto per non cambiare)</label>
+                <input type="password" id="edit-password" class="app-input" placeholder="Nuova password">
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button class="liquid-btn" id="save-profile-btn" style="flex: 1; padding: 10px; font-weight: bold;">SALVA</button>
+                <button class="liquid-btn" id="close-profile-modal-btn" style="flex: 1; padding: 10px; background: rgba(255,71,87,0.3); border: 1px solid #ff4757;">ANNULLA</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALE PROFILO PUBBLICO (ALTRUI) -->
+    <div id="public-profile-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width: 400px; width: 90%; padding: 0; overflow: hidden; border-radius: 16px;">
+            <div id="pub-profile-banner" style="height: 90px; background: linear-gradient(135deg, #0077ff, #00d4ff); background-size: cover; background-position: center; position: relative;">
+                <button onclick="closePublicProfileModal()" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.5); border: none; color: #fff; border-radius: 50%; width: 26px; height: 26px; cursor: pointer; font-weight: bold;">✕</button>
+            </div>
+            
+            <div style="padding: 0 16px 16px 16px; position: relative; text-align: left;">
+                <img id="pub-profile-img" src="https://visage.surgeplay.com/face/64/Steve" alt="Avatar" style="width: 54px; height: 54px; border-radius: 50%; border: 3px solid #1a1a1a; object-fit: cover; margin-top: -28px; background: #000; position: relative;" />
+                
+                <div style="margin-top: 4px;">
+                    <h3 id="pub-profile-name" style="font-size: 14px; color: #fff; margin: 0;">Nome Utente</h3>
+                    <span id="pub-profile-tag" style="font-size: 10px; color: #00d4ff;">@tag</span>
+                </div>
+
+                <div style="margin-top: 12px; background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 8px;">
+                    <span style="font-size: 9px; color: #aaa; display: block; font-weight: bold;">BIO</span>
+                    <p id="pub-profile-bio" style="font-size: 11px; color: #eee; margin: 2px 0 0 0; word-break: break-word;">Nessuna bio inserita.</p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
+                    <div style="background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.2); padding: 8px; border-radius: 8px; text-align: center;">
+                        <span style="font-size: 9px; color: #00d4ff; display: block;">💎 DIAMANTI SCAVATI</span>
+                        <strong id="pub-profile-diamonds" style="font-size: 14px; color: #fff;">0</strong>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 8px; border-radius: 8px; text-align: center;">
+                        <span style="font-size: 9px; color: #aaa; display: block;">🛡️ RUOLO</span>
+                        <strong id="pub-profile-role" style="font-size: 12px; color: #fff;">USER</strong>
+                    </div>
+                </div>
+
+                <div id="pub-profile-email-container" style="margin-top: 10px; display: none; background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 8px;">
+                    <span style="font-size: 9px; color: #aaa; display: block; font-weight: bold;">EMAIL DI CONTATTO</span>
+                    <span id="pub-profile-email" style="font-size: 11px; color: #00d4ff; word-break: break-all;">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOTTOM SHEET (CASSETTO FLUIDO) -->
+    <div id="bottom-sheet-overlay" class="sheet-overlay">
+        <div class="sheet-content">
+            <div class="sheet-handle"></div>
+            <h3 class="sheet-title">NETWORK HUB</h3>
+            <div class="sheet-grid">
+                <button class="sheet-card" data-tab="mc-it" data-title="MINECRAFT.IT">
+                    <span class="sheet-icon">🧊</span>
+                    <span class="sheet-label">Minecraft.it</span>
+                </button>
+                <button class="sheet-card" data-tab="apexlock" data-title="APEXLOCK PRO">
+                    <span class="sheet-icon">🔒</span>
+                    <span class="sheet-label">Security</span>
+                </button>
+                <button class="sheet-card" data-tab="radio" data-title="ZETAWEAR STORE">
+                    <span class="sheet-icon">👕</span>
+                    <span class="sheet-label">ZetaWear</span>
+                </button>
+                <button class="sheet-card" data-tab="settings" data-title="OPZIONI">
+                    <span class="sheet-icon">⚙️</span>
+                    <span class="sheet-label">Opzioni</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-container">
+        
+        <header class="app-header">
+            <div class="liquid-glow"></div>
+            <h1 id="app-title">ZETACRAFT WEB</h1>
+            <p class="subtitle">PREMIUM HUB // MOBILE</p>
+        </header>
+
+        <main class="app-content">
+
+            <!-- SCHEDA 1: HOME -->
+            <div id="tab-web" class="tab-panel active">
+                <div class="link-bypass-box">
+                    <p>Esplora il portale ufficiale di ZetaCraft per accedere alle risorse del network e alle info sul server.</p>
+                    <a href="https://zetacraft.my.canva.site" target="_blank" class="liquid-btn" style="width: 100%; display: block; box-sizing: border-box;">
+                        🚀 ENTRA NEL SITO UFFICIALE
+                    </a>
+                </div>
+
+                <div class="link-bypass-box mc-options-box">
+                    <h2 class="section-heading">⚡ SCORCIATOIE INTERATTIVE</h2>
+                    <div class="sheet-grid" style="grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px;">
+                        <div class="sheet-card quick-shortcut-btn" data-info="AZIONI RP:&#10;Usa /sit, /lay o /crawl per far sedere, sdraiare o strisciare il tuo personaggio!" style="padding: 12px;">
+                            <span class="sheet-icon">🪑</span>
+                            <span class="sheet-label">Azioni RP</span>
+                        </div>
+                        <div class="sheet-card quick-shortcut-btn" data-info="TELETRASPORTI:&#10;Usa /spawn per tornare all'hub, o /tpa [player] per raggiungere un amico!" style="padding: 12px;">
+                            <span class="sheet-icon">🌀</span>
+                            <span class="sheet-label">Teleport</span>
+                        </div>
+                        <div class="sheet-card quick-shortcut-btn" data-info="SKIN SHOWCASE:&#10;Vai nella scheda ZetaWear dall'Hub per visualizzare in 3D qualsiasi skin Minecraft!" style="padding: 12px;">
+                            <span class="sheet-icon">👕</span>
+                            <span class="sheet-label">Style & Skin</span>
+                        </div>
+                        <div class="sheet-card quick-shortcut-btn" data-info="SUPPORTO STAFF:&#10;In caso di necessità chiedi in chat o apri un ticket sul server Discord!" style="padding: 12px;">
+                            <span class="sheet-icon">🆘</span>
+                            <span class="sheet-label">Supporto</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SCHEDA 2: COMMUNITY POSTS -->
+            <div id="tab-posts" class="tab-panel">
+                <div class="link-bypass-box mc-options-box">
+                    <h2 class="section-heading">💬 COMMUNITY POSTS</h2>
+                    
+                    <!-- BOX UTENTE AUTENTICATO CON BANNER E PULSANTE IMPOSTAZIONI PROFILO -->
+                    <div id="auth-logged-box" class="setting-row" style="display: none; flex-direction: column; align-items: stretch; margin-bottom: 12px; padding: 0; overflow: hidden; border-radius: 12px; border: 1px solid #00d4ff;">
+                        <div id="user-banner-preview" style="height: 70px; background: linear-gradient(135deg, #0077ff, #00d4ff); background-size: cover; background-position: center;"></div>
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: rgba(0,0,0,0.4);">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <img id="user-profile-img" src="https://visage.surgeplay.com/face/64/Steve" alt="Profile" style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid #00d4ff; object-fit: cover; margin-top: -18px; background: #000;" />
+                                <div style="display: flex; flex-direction: column; text-align: left;">
+                                    <span id="user-display-name" class="setting-label" style="font-size: 12px; color: #00d4ff; font-weight: bold;">-</span>
+                                    <span id="user-username-tag" style="font-size: 9px; color: #aaa;">-</span>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 6px;">
+                                <button id="open-profile-settings-btn" class="liquid-btn" style="font-size: 9px; padding: 6px 8px; background: rgba(0,212,255,0.2); border: 1px solid #00d4ff;" title="Impostazioni Profilo">
+                                    ⚙️ PROFILO
+                                </button>
+                                <button id="logout-btn" class="liquid-btn logout-action-btn" title="Logout" style="padding: 6px 8px; font-size: 9px;">
+                                    <span>LOGOUT</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SCHEDA AUTENTICAZIONE COMPLETA -->
+                    <div id="auth-form-box" class="setting-row" style="flex-direction: column; align-items: stretch; gap: 8px; margin-bottom: 15px; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px;">
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 11px; font-weight: bold; color: #00d4ff;" id="auth-mode-title">ACCEDI</span>
+                            <button id="toggle-auth-mode-btn" type="button" style="background: none; border: none; color: #00d4ff; font-size: 10px; text-decoration: underline; cursor: pointer;">Non hai un account? Registrati</button>
+                        </div>
+                        
+                        <div id="reg-fields" style="display: none; flex-direction: column; gap: 8px;">
+                            <input type="text" id="auth-displayName-input" class="app-input" placeholder="Nome Visualizzato (es. Utente)">
+                            <input type="text" id="auth-username-input" class="app-input" placeholder="Nome Utente con @ (es. @utente)">
+                            <input type="url" id="auth-imgprofile-input" class="app-input" placeholder="Link Immagine Profilo [opzionale]">
+                            <input type="url" id="auth-banner-input" class="app-input" placeholder="Link Banner Profilo (lascia vuoto per colore casuale)">
+                        </div>
+
+                        <input type="email" id="auth-email-input" class="app-input" placeholder="Email (es. utente@mail.net)">
+                        <input type="password" id="auth-password-input" class="app-input" placeholder="Password">
+
+                        <div class="captcha-wrapper">
+                            <div class="g-recaptcha" data-sitekey="6Lc9lt4tAAAAADEBX3xxefES24qajWjOIFB2MUWg" data-theme="dark"></div>
+                        </div>
+
+                        <button id="auth-submit-btn" class="liquid-btn" style="width: 100%; margin-top: 4px; padding: 10px; font-weight: bold;">ACCEDI</button>
+
+                        <div style="display: flex; align-items: center; gap: 10px; margin: 8px 0;">
+                            <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.2);"></div>
+                            <span style="font-size: 10px; color: #aaa;">oppure accedi con</span>
+                            <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.2);"></div>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <button type="button" id="login-google-btn" class="liquid-btn social-btn" style="background: #db4437;">
+                                <img src="google.png" alt="Google" class="social-btn-logo" onerror="this.style.display='none'">
+                                <span>ACCEDI CON GOOGLE</span>
+                            </button>
+                            <button type="button" id="login-github-btn" class="liquid-btn social-btn" style="background: #24292e;">
+                                <img src="github.png" alt="GitHub" class="social-btn-logo" onerror="this.style.display='none'">
+                                <span>ACCEDI CON GITHUB</span>
+                            </button>
+                            <button type="button" id="login-yahoo-btn" class="liquid-btn social-btn" style="background: #6001d2;">
+                                <img src="yahoo.png" alt="Yahoo" class="social-btn-logo" onerror="this.style.display='none'">
+                                <span>ACCEDI CON YAHOO</span>
+                            </button>
+                            <button type="button" id="login-discord-btn" class="liquid-btn social-btn" style="background: #5865F2;">
+                                <img src="discord.png" alt="Discord" class="social-btn-logo" onerror="this.style.display='none'">
+                                <span>ACCEDI CON DISCORD</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- PULSANTI FILTRO RUOLI -->
+                    <div style="display: flex; gap: 6px; margin-bottom: 15px;">
+                        <button type="button" id="filter-all-btn" class="liquid-btn" onclick="setPostFilter('all')" style="flex: 1; font-size: 10px; padding: 8px; background: rgba(0,212,255,0.2); border: 1px solid #00d4ff;">
+                            🌐 TUTTI
+                        </button>
+                        <button type="button" id="filter-staff-btn" class="liquid-btn" onclick="setPostFilter('staff')" style="flex: 1; font-size: 10px; padding: 8px; background: linear-gradient(135deg, #00d4ff, #0077ff);">
+                            🛡️ STAFF
+                        </button>
+                        <button type="button" id="filter-users-btn" class="liquid-btn" onclick="setPostFilter('user')" style="flex: 1; font-size: 10px; padding: 8px; background: rgba(255,255,255,0.1);">
+                            👤 UTENTI
+                        </button>
+                    </div>
+
+                    <!-- FORM PUBBLICAZIONE POST -->
+                    <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 10px; background: rgba(0,0,0,0.25);">
+                        <textarea id="post-text-input" class="app-input" rows="3" placeholder="Scrivi qualcosa alla community..." style="resize: none; font-family: inherit;" disabled></textarea>
+                        <input type="url" id="post-link-input" class="app-input" placeholder="Incolla link (YouTube, immagini, audio o sito web)..." disabled />
+                        <button id="publish-post-btn" class="liquid-btn" style="width: 100%; opacity: 0.4;" disabled>
+                            🚀 PUBBLICA POST
+                        </button>
+                    </div>
+
+                    <div class="options-divider"></div>
+
+                    <div id="community-posts-list" style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;">
+                        <p class="options-subtitle" style="margin: 0;">Caricamento post in corso...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SCHEDA 3: SERVER MINECRAFT -->
+            <div id="tab-minecraft" class="tab-panel">
+                <div class="live-clock-badge">
+                    <div class="status-indicator-container" title="Server Online">
+                        <div class="pulse-dot"></div>
+                        <span class="status-label">ONLINE</span>
+                    </div>
+
+                    <span id="realtime-clock">00:00:00</span>
+                </div>
+
+                <div class="info-alert">
+                    <div class="alert-header">📢 CREDENZIALI DI ACCENSIONE ATERNOS</div>
+                    <div class="alert-body">
+                        👤 USERNAME: <span class="code-text">FanDiZeta</span><br>
+                        🔑 PASSWORD: <span class="code-text">fandizeta_zetacraft$2026</span>
+                    </div>
+                </div>
+
+                <div class="ip-copy-card" id="copy-ip-card">
+                    <div class="ip-info">
+                        <span class="ip-title">INDIRIZZO IP SERVER</span>
+                        <span class="ip-address">zetacraft-ita.aternos.me</span>
+                    </div>
+                    <button class="ip-copy-btn">
+                        <span id="copy-btn-text">📋 COPIA IP</span>
+                    </button>
+                </div>
+
+                <div class="link-bypass-box">
+                    <p>Per accendere il server, clicca il pulsante qui sotto ed inserisci le credenziali scritte in alto!</p>
+                    <a href="https://aternos.org/servers/" target="_blank" class="liquid-btn" style="width: 100%; display: block; text-align: center; box-sizing: border-box; margin-bottom: 10px;">🔋 APRI PANNELLO DI ACCENSIONE</a>
+                    
+                    <button id="open-minigame-btn" class="liquid-btn" style="width: 100%; text-align: center; box-sizing: border-box; background: linear-gradient(135deg, #00c853 0%, #009688 100%); cursor: pointer;">
+                        🎮 PROVA UN MINIGIOCO
+                    </button>
+                </div>
+
+                <div id="minigame-container" style="display: none; flex-direction: column; gap: 8px; margin-top: 5px; animation: fadeIn 0.3s ease;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 11px; font-weight: bold; color: #00d4ff;">MINING CLICKER LIVE</span>
+                        <button id="close-minigame-btn" style="background: none; border: none; color: #ff4757; font-size: 11px; font-weight: bold; cursor:pointer;">✖ CHIUDI</button>
+                    </div>
+                    <div style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(0, 212, 255, 0.3); border-radius: 16px; overflow: hidden; height: 340px;">
+                        <iframe id="minigame-iframe" src="" style="width: 100%; height: 100%; border: none;"></iframe>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SCHEDA 4: MINECRAFT.IT -->
+            <div id="tab-mc-it" class="tab-panel">
+                <iframe src="https://minecraft.it/servers/zetacraft" class="web-frame" title="Minecraft.it Portal"></iframe>
+            </div>
+
+            <!-- SCHEDA 5: APEXLOCK -->
+            <div id="tab-apexlock" class="tab-panel">
+                <iframe src="https://zetaytofficial.github.io/apexlock-pro/" class="web-frame" title="ApexLock Security Platform"></iframe>
+            </div>
+
+            <!-- SCHEDA 6: ZETAWEAR SKIN -->
+            <div id="tab-radio" class="tab-panel">
+                <div class="link-bypass-box">
+                    <h2 class="section-heading">👕 ZETAWEAR SKIN SHOWCASE</h2>
+                    <p>Digita il tuo nickname per controllare la divisa dello Staff!</p>
+                    
+                    <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+                        <input type="text" id="skin-username" placeholder="Inserisci Nickname..." class="app-input">
+                        <button id="search-skin-btn" class="liquid-btn" style="padding: 10px 16px; cursor: pointer;">CERCA</button>
+                    </div>
+
+                    <div style="background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 10px; display: flex; justify-content: center; align-items: center; min-height: 480px; overflow: hidden;">
+                        <iframe id="skin-3d-iframe" src="https://visage.surgeplay.com/full/512/Steve" style="width: 100%; height: 480px; border: none; border-radius: 12px; background: transparent;" title="Minecraft Skin Viewer"></iframe>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SCHEDA 7: OPZIONI -->
+            <div id="tab-settings" class="tab-panel">
+                <div class="link-bypass-box mc-options-box">
+                    <h2 class="section-heading">⚙ OPZIONI DEL NETWORK</h2>
+                    <p class="options-subtitle">Personalizza l'esperienza e condividi l'app con la tua community.</p>
+                    
+                    <div class="setting-row share-row">
+                        <button id="copy-app-link-btn" class="liquid-btn share-btn">
+                            <svg class="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                                <path d="M14 11a5 5 0 0 0-7.54 .54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                            </svg>
+                            <span id="copy-app-btn-text">Copia Link dell'Applicazione</span>
+                        </button>
+                    </div>
+
+                    <div class="options-divider"></div>
+
+                    <div class="setting-row">
+                        <span class="setting-label">🛡️ Gestione Dati e Privacy</span>
+                        <button id="open-data-modal-btn" class="liquid-btn setting-btn">GESTISCI DATI</button>
+                    </div>
+
+                    <div class="setting-row">
+                        <span class="setting-label">🔊 Effetti Audio Clic</span>
+                        <button id="audio-toggle-btn" class="liquid-btn setting-btn">ATTIVATO</button>
+                    </div>
+
+                    <div class="setting-row">
+                        <span class="setting-label">🎨 Tema Grafico</span>
+                        <button id="theme-toggle-btn" class="liquid-btn setting-btn">SCURO</button>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- BARRA NAVIGAZIONE -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-tab="web" data-title="ZETACRAFT WEB">
+                <span class="nav-icon">🌐</span>
+                <span class="nav-label">Home</span>
+            </button>
+
+            <button class="nav-item" data-tab="posts" data-title="COMMUNITY POSTS">
+                <span class="nav-icon">💬</span>
+                <span class="nav-label">Post</span>
+            </button>
+
+            <button class="nav-item" data-tab="minecraft" data-title="SERVER STATUS">
+                <span class="nav-icon">🎮</span>
+                <span class="nav-label">Server</span>
+            </button>
+
+            <button class="nav-item" id="open-sheet-btn">
+                <span class="nav-icon">✨</span>
+                <span class="nav-label">Hub</span>
+            </button>
+        </nav>
+
+    </div>
+
+<script type="text/javascript">window.$crisp=[];window.CRISP_WEBSITE_ID="753167dc-522e-46f9-b323-bc0867c2fd7d";(function(){d=document;s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();</script>
+    <script src="app-logic.js"></script>
+
+</body>
+</html>
