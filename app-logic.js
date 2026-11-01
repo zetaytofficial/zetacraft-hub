@@ -1,5 +1,5 @@
 const MINECRAFT_SERVER_IP = "zetacraft-ita.aternos.me";
-const APP_SHARE_URL = "https://zetacraft.hostedbyfps.com";
+const APP_SHARE_URL = "https://zetacraft-hub.zetayt.workers.dev";
 
 // CONFIGURAZIONE FIREBASE
 const firebaseConfig = {
@@ -253,8 +253,8 @@ function toggleAuthMode() {
         if (modeTitle) modeTitle.innerText = 'ACCEDI';
     }
 
-    if (typeof grecaptcha !== 'undefined') {
-        try { grecaptcha.reset(); } catch(e) {}
+    if (typeof turnstile !== 'undefined') {
+        try { turnstile.reset(); } catch(e) {}
     }
 }
 
@@ -272,14 +272,11 @@ async function handleAuthSubmit() {
         return;
     }
 
-    if (typeof grecaptcha !== 'undefined') {
-        try {
-            const captchaResponse = grecaptcha.getResponse();
-            if (!captchaResponse || captchaResponse.trim().length === 0) {
-                alert("⚠️ DEVI OBBLIGATORIAMENTE CLICCARE SUL CAPTCHA PER CONTINUARE!");
-                return;
-            }
-        } catch(e) {}
+    // CONTROLLO CLOUDFLARE TURNSTILE
+    const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]');
+    if (!turnstileResponse || !turnstileResponse.value.trim()) {
+        alert("⚠️ DEVI COMPLETARE LA VERIFICA DI CLOUDFLARE TURNSTILE PER CONTINUARE!");
+        return;
     }
 
     if (!auth) {
@@ -324,13 +321,13 @@ async function handleAuthSubmit() {
             await auth.signInWithEmailAndPassword(email, password);
         }
 
-        if (typeof grecaptcha !== 'undefined') {
-            try { grecaptcha.reset(); } catch(e) {}
+        if (typeof turnstile !== 'undefined') {
+            try { turnstile.reset(); } catch(e) {}
         }
     } catch (err) {
         alert("Errore: " + err.message);
-        if (typeof grecaptcha !== 'undefined') {
-            try { grecaptcha.reset(); } catch(e) {}
+        if (typeof turnstile !== 'undefined') {
+            try { turnstile.reset(); } catch(e) {}
         }
     }
 }
