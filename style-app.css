@@ -1032,3 +1032,30 @@ body.light-theme .share-btn {
     background: linear-gradient(135deg, rgba(255, 71, 87, 0.35) 0%, rgba(255, 107, 129, 0.4) 100%);
     box-shadow: 0 4px 12px rgba(255, 71, 87, 0.2);
 }
+
+/* --- 1. FIX CRISP WIDGET (Sopra la bottom nav) --- */
+#crisp-chatbox, 
+.cc-t-k, 
+[class*="crisp-client"] {
+    bottom: 85px !important;
+    right: 15px !important;
+}
+
+/* --- 2. OPTIMIZED WEB FRAME PER GALAXY A52S E SCHERMI ALLUNGATI --- */
+.web-frame {
+    width: 100%;
+    flex: 1;
+    min-height: calc(100vh - 170px);
+    max-height: calc(100vh - 170px);
+    border: none;
+    border-radius: 20px;
+    background-color: #ffffff;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* --- 4. FIX TEMA CHIARO PER LE CARD POST --- */
+body.light-theme .post-card-light {
+    background: rgba(255, 255, 255, 0.85) !important;
+    border: 1px solid rgba(0, 100, 220, 0.2) !important;
+    color: #081c33 !important;
+}
