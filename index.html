@@ -13,16 +13,14 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
-    <!-- GOOGLE RECAPTCHA API -->
-    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
-</head>
-<body>
+    <!-- AGGIUNGI QUESTA RIGA -->
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 
     <!-- POP-UP BENVENUTO E GESTIONE DATI CON ACCETTA / RIFIUTA -->
     <div id="welcome-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <div class="modal-glow"></div>
-            <h3 class="modal-title">⚡ ZETACRAFT V1.3</h3>
+            <h3 class="modal-title">⚡ ZETACRAFT V1.4</h3>
             <p class="modal-text">
                 Benvenuto nel Network Hub! Per offrirti un'esperienza ottimale e sicura, l'app richiede l'uso del salvataggio dati locale (sessione, audio e tema).
             </p>
@@ -236,9 +234,8 @@
                         <input type="password" id="auth-password-input" class="app-input" placeholder="Password">
 
                         <div class="captcha-wrapper">
-                            <div class="g-recaptcha" data-sitekey="6Lc9lt4tAAAAADEBX3xxefES24qajWjOIFB2MUWg" data-theme="dark"></div>
-                        </div>
-
+    <div class="cf-turnstile" data-sitekey="0x4AAAAAAFkIDA2Y9kPf2u5S" data-theme="dark"></div>
+</div>
                         <button id="auth-submit-btn" class="liquid-btn" style="width: 100%; margin-top: 4px; padding: 10px; font-weight: bold;">ACCEDI</button>
 
                         <div style="display: flex; align-items: center; gap: 10px; margin: 8px 0;">
@@ -347,9 +344,12 @@
             </div>
 
             <!-- SCHEDA 4: MINECRAFT.IT -->
-            <div id="tab-mc-it" class="tab-panel">
-                <iframe src="https://minecraft.it/servers/zetacraft" class="web-frame" title="Minecraft.it Portal"></iframe>
-            </div>
+<div id="tab-mc-it" class="tab-panel">
+    <div style="background: rgba(0, 150, 255, 0.12); border: 1px solid rgba(0, 212, 255, 0.3); padding: 8px 12px; border-radius: 12px; margin-bottom: 8px; font-size: 10px; color: #fff;">
+        ℹ️ <strong>Nota:</strong> Questo è un portale esterno (Minecraft.it). I login effettuati qui sono separati da ZetaCraft Hub.
+    </div>
+    <iframe src="https://minecraft.it/servers/zetacraft" class="web-frame" title="Minecraft.it Portal"></iframe>
+</div>
 
             <!-- SCHEDA 5: APEXLOCK -->
             <div id="tab-apexlock" class="tab-panel">
