@@ -13,8 +13,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
-    <!-- AGGIUNGI QUESTA RIGA -->
-<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 
     <!-- POP-UP BENVENUTO E GESTIONE DATI CON ACCETTA / RIFIUTA -->
     <div id="welcome-modal" class="modal-overlay hidden">
@@ -62,7 +61,6 @@
                 <label style="font-size: 10px; color: #00d4ff;">Email</label>
                 <input type="email" id="edit-email" class="app-input" placeholder="La tua email">
 
-                <!-- CHECKBOX PRIVACY EMAIL -->
                 <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
                     <input type="checkbox" id="edit-show-email" style="cursor: pointer;">
                     <label for="edit-show-email" style="font-size: 10px; color: #ccc; cursor: pointer;">Mostra la mia email alla community</label>
@@ -114,11 +112,15 @@
                     <span style="font-size: 9px; color: #aaa; display: block; font-weight: bold;">EMAIL DI CONTATTO</span>
                     <span id="pub-profile-email" style="font-size: 11px; color: #00d4ff; word-break: break-all;">-</span>
                 </div>
+
+                <button id="pub-profile-send-mail-btn" class="liquid-btn" style="width: 100%; margin-top: 12px; font-size: 10px; padding: 8px;">
+                    ✉️ Invia ZetaMail (Messaggio Privato)
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- BOTTOM SHEET (CASSETTO FLUIDO) -->
+    <!-- BOTTOM SHEET (CASSETTO FLUIDO HUB) -->
     <div id="bottom-sheet-overlay" class="sheet-overlay">
         <div class="sheet-content">
             <div class="sheet-handle"></div>
@@ -191,7 +193,6 @@
                 <div class="link-bypass-box mc-options-box">
                     <h2 class="section-heading">💬 COMMUNITY POSTS</h2>
                     
-                    <!-- BOX UTENTE AUTENTICATO CON BANNER E PULSANTE IMPOSTAZIONI PROFILO -->
                     <div id="auth-logged-box" class="setting-row" style="display: none; flex-direction: column; align-items: stretch; margin-bottom: 12px; padding: 0; overflow: hidden; border-radius: 12px; border: 1px solid #00d4ff;">
                         <div id="user-banner-preview" style="height: 70px; background: linear-gradient(135deg, #0077ff, #00d4ff); background-size: cover; background-position: center;"></div>
                         
@@ -215,7 +216,6 @@
                         </div>
                     </div>
 
-                    <!-- SCHEDA AUTENTICAZIONE COMPLETA -->
                     <div id="auth-form-box" class="setting-row" style="flex-direction: column; align-items: stretch; gap: 8px; margin-bottom: 15px; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px;">
                         
                         <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -234,8 +234,8 @@
                         <input type="password" id="auth-password-input" class="app-input" placeholder="Password">
 
                         <div class="captcha-wrapper">
-    <div class="cf-turnstile" data-sitekey="0x4AAAAAAFkIDA2Y9kPf2u5S" data-theme="dark"></div>
-</div>
+                            <div class="cf-turnstile" data-sitekey="0x4AAAAAAFkIDA2Y9kPf2u5S" data-theme="dark"></div>
+                        </div>
                         <button id="auth-submit-btn" class="liquid-btn" style="width: 100%; margin-top: 4px; padding: 10px; font-weight: bold;">ACCEDI</button>
 
                         <div style="display: flex; align-items: center; gap: 10px; margin: 8px 0;">
@@ -264,7 +264,6 @@
                         </div>
                     </div>
 
-                    <!-- PULSANTI FILTRO RUOLI -->
                     <div style="display: flex; gap: 6px; margin-bottom: 15px;">
                         <button type="button" id="filter-all-btn" class="liquid-btn" onclick="setPostFilter('all')" style="flex: 1; font-size: 10px; padding: 8px; background: rgba(0,212,255,0.2); border: 1px solid #00d4ff;">
                             🌐 TUTTI
@@ -277,7 +276,6 @@
                         </button>
                     </div>
 
-                    <!-- FORM PUBBLICAZIONE POST -->
                     <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 10px; background: rgba(0,0,0,0.25);">
                         <textarea id="post-text-input" class="app-input" rows="3" placeholder="Scrivi qualcosa alla community..." style="resize: none; font-family: inherit;" disabled></textarea>
                         <input type="url" id="post-link-input" class="app-input" placeholder="Incolla link (YouTube, immagini, audio o sito web)..." disabled />
@@ -294,7 +292,29 @@
                 </div>
             </div>
 
-            <!-- SCHEDA 3: SERVER MINECRAFT -->
+            <!-- SCHEDA 3: ZETAMAIL (MESSAGGI PRIVATI) -->
+            <div id="tab-zetamail" class="tab-panel">
+                <div class="link-bypass-box mc-options-box" style="text-align: left;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <h2 class="section-heading" style="margin: 0;">✉️ ZETAMAIL DM</h2>
+                        <span id="user-zh-address" style="font-size: 9px; color: #00d4ff; background: rgba(0,212,255,0.1); padding: 4px 8px; border-radius: 6px;">@zh.net</span>
+                    </div>
+
+                    <div style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 12px; border: 1px solid rgba(0,212,255,0.2); margin-bottom: 15px;">
+                        <span style="font-size: 10px; color: #00d4ff; font-weight: bold; display: block; margin-bottom: 6px;">NUOVO MESSAGGIO PRIVATO</span>
+                        <input type="text" id="zetamail-recipient-input" class="app-input" placeholder="Destinatario (es. @utente o user@zh.net)" style="margin-bottom: 8px; font-size: 11px;" />
+                        <textarea id="zetamail-text-input" class="app-input" rows="2" placeholder="Scrivi un messaggio privato..." style="resize: none; font-family: inherit; margin-bottom: 8px; font-size: 11px;"></textarea>
+                        <button onclick="sendZetaMailMessage()" class="liquid-btn" style="width: 100%; padding: 8px; font-size: 11px;">INVIA MESSAGGIO</button>
+                    </div>
+
+                    <h3 style="font-size: 11px; color: #aaa; margin-bottom: 8px; font-weight: bold;">CASSETTA POSTALE (IN ARRIVO)</h3>
+                    <div id="zetamail-messages-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto;">
+                        <p style="font-size: 10px; color: #888; text-align: center; margin: 10px 0;">Accedi per visualizzare i tuoi messaggi privati.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SCHEDA 4: SERVER MINECRAFT -->
             <div id="tab-minecraft" class="tab-panel">
                 <div class="live-clock-badge">
                     <div class="status-indicator-container" title="Server Online">
@@ -343,20 +363,20 @@
                 </div>
             </div>
 
-            <!-- SCHEDA 4: MINECRAFT.IT -->
-<div id="tab-mc-it" class="tab-panel">
-    <div style="background: rgba(0, 150, 255, 0.12); border: 1px solid rgba(0, 212, 255, 0.3); padding: 8px 12px; border-radius: 12px; margin-bottom: 8px; font-size: 10px; color: #fff;">
-        ℹ️ <strong>Nota:</strong> Questo è un portale esterno (Minecraft.it). I login effettuati qui sono separati da ZetaCraft Hub.
-    </div>
-    <iframe src="https://minecraft.it/servers/zetacraft" class="web-frame" title="Minecraft.it Portal"></iframe>
-</div>
+            <!-- SCHEDA 5: MINECRAFT.IT -->
+            <div id="tab-mc-it" class="tab-panel">
+                <div style="background: rgba(0, 150, 255, 0.12); border: 1px solid rgba(0, 212, 255, 0.3); padding: 8px 12px; border-radius: 12px; margin-bottom: 8px; font-size: 10px; color: #fff;">
+                    ℹ️ <strong>Nota:</strong> Questo è un portale esterno (Minecraft.it). I login effettuati qui sono separati da ZetaCraft Hub.
+                </div>
+                <iframe src="https://minecraft.it/servers/zetacraft" class="web-frame" title="Minecraft.it Portal"></iframe>
+            </div>
 
-            <!-- SCHEDA 5: APEXLOCK -->
+            <!-- SCHEDA 6: APEXLOCK -->
             <div id="tab-apexlock" class="tab-panel">
                 <iframe src="https://zetaytofficial.github.io/apexlock-pro/" class="web-frame" title="ApexLock Security Platform"></iframe>
             </div>
 
-            <!-- SCHEDA 6: ZETAWEAR SKIN -->
+            <!-- SCHEDA 7: ZETAWEAR SKIN -->
             <div id="tab-radio" class="tab-panel">
                 <div class="link-bypass-box">
                     <h2 class="section-heading">👕 ZETAWEAR SKIN SHOWCASE</h2>
@@ -373,7 +393,7 @@
                 </div>
             </div>
 
-            <!-- SCHEDA 7: OPZIONI -->
+            <!-- SCHEDA 8: OPZIONI -->
             <div id="tab-settings" class="tab-panel">
                 <div class="link-bypass-box mc-options-box">
                     <h2 class="section-heading">⚙ OPZIONI DEL NETWORK</h2>
@@ -422,6 +442,11 @@
                 <span class="nav-label">Post</span>
             </button>
 
+            <button class="nav-item" data-tab="zetamail" data-title="ZETAMAIL">
+                <span class="nav-icon">✉️</span>
+                <span class="nav-label">Mail</span>
+            </button>
+
             <button class="nav-item" data-tab="minecraft" data-title="SERVER STATUS">
                 <span class="nav-icon">🎮</span>
                 <span class="nav-label">Server</span>
@@ -434,7 +459,6 @@
         </nav>
 
     </div>
-
 
     <script src="app-logic.js"></script>
 
