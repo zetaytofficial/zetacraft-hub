@@ -21,21 +21,7 @@ let dynamicBlockedWordsCache = [];
 let lastBannedWordsFetchTime = 0;
 const BANNED_WORDS_CACHE_TTL = 60000;
 
-let fallbackPosts = [
-    {
-        id: "fallback-1",
-        authorName: "Staff ZetaCraft Hub",
-        usernameTag: "@staff_zetacraft_hub",
-        imgprofile: "https://i.ibb.co/gLnG06cj/gemini-svg.png",
-        role: "founder",
-        text: "Benvenuti nella nuova scheda Community Posts con Like, Commenti e filtri AutoMod dinamici!",
-        mediaUrl: "",
-        mediaType: "none",
-        likeCount: 5,
-        likes: {},
-        reports: 0
-    }
-];
+let fallbackPosts = [];
 
 try {
     if (firebaseConfig.apiKey !== "" && typeof firebase !== 'undefined') {
@@ -89,6 +75,95 @@ function getRandomHexColor() {
     return color;
 }
 
+// ✉️ GENERAZIONE EMAIL FITTIZIA @zh.net
+function getZetaMailAddress(usernameTag) {
+    if (!usernameTag) return "utente@zh.net";
+    const clean = usernameTag.replace('@', '').toLowerCase().trim();
+    return `${clean}@zh.net`;
+}
+
+// 🚀 ASCOLTO MESSAGGI PRIVATI (ZETAMAIL)
+function listenZetaMailMessages() {
+    if (!db || !currentUserProfile) return;
+
+    const myEmail = getZetaMailAddress(currentUserProfile.usernameTag);
+    const myUid = currentUserProfile.uid;
+
+    db.collection("private_messages")
+        .where("recipientEmail", "==", myEmail)
+        .orderBy("createdAt", "desc")
+        .onSnapshot(snapshot => {
+            const listElem = document.getElementById('zetamail-messages-list');
+            if (!listElem) return;
+
+            if (snapshot.empty) {
+                listElem.innerHTML = `<p style="font-size: 10px; color: #888; text-align: center; margin: 10px 0;">Nessun messaggio privato ricevuto.</p>`;
+                return;
+            }
+
+            listElem.innerHTML = snapshot.docs.map(doc => {
+                const msg = doc.data();
+                const dateStr = msg.createdAt && msg.createdAt.toDate ? msg.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recente';
+                
+                return `
+                    <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(0,212,255,0.2); padding: 10px; border-radius: 10px; text-align: left;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <strong style="font-size: 11px; color: #00d4ff;">Da: ${msg.senderEmail}</strong>
+                            <span style="font-size: 9px; color: #aaa;">${dateStr}</span>
+                        </div>
+                        <p style="font-size: 11px; color: #fff; margin: 0; word-break: break-word;">${msg.text}</p>
+                    </div>
+                `;
+            }).join('');
+        }, err => {
+            console.error("Errore ascolto ZetaMail:", err);
+        });
+}
+
+// ✉️ INVIO MESSAGGIO PRIVATO
+async function sendZetaMailMessage() {
+    if (!currentUserProfile) return alert("Accedi per inviare messaggi privati!");
+
+    const recipientInput = document.getElementById('zetamail-recipient-input');
+    const textInput = document.getElementById('zetamail-text-input');
+
+    if (!recipientInput || !textInput) return;
+
+    let recipient = recipientInput.value.trim().toLowerCase();
+    const rawText = textInput.value.trim();
+
+    if (!recipient || !rawText) {
+        alert("Inserisci il destinatario e il testo del messaggio!");
+        return;
+    }
+
+    if (!recipient.includes('@')) {
+        recipient = '@' + recipient;
+    }
+    if (!recipient.endsWith('@zh.net')) {
+        recipient = recipient.replace('@', '') + '@zh.net';
+    }
+
+    const text = await filterProfanity(rawText);
+
+    try {
+        await db.collection("private_messages").add({
+            senderUid: currentUserProfile.uid,
+            senderEmail: getZetaMailAddress(currentUserProfile.usernameTag),
+            recipientEmail: recipient,
+            text: text,
+            read: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        alert("✅ ZetaMail inviata con successo!");
+        textInput.value = "";
+        recipientInput.value = "";
+    } catch (e) {
+        alert("Errore invio ZetaMail: " + e.message);
+    }
+}
+
 // SINCRONIZZAZIONE ED AGGIORNAMENTO DIAMANTI SU FIREBASE
 async function addDiamondsToUser(amount = 1) {
     let currentLocal = parseInt(localStorage.getItem('zetac_minigame_diamonds') || '0', 10);
@@ -127,6 +202,7 @@ function updateUIWithProfile(profile) {
     const publishBtn = document.getElementById('publish-post-btn');
     const profileImgElem = document.getElementById('user-profile-img');
     const bannerPreview = document.getElementById('user-banner-preview');
+    const zhAddressElem = document.getElementById('user-zh-address');
 
     if (profile) {
         currentUserProfile = profile;
@@ -136,6 +212,7 @@ function updateUIWithProfile(profile) {
 
         if (displayNameElem) displayNameElem.innerText = `👋 ${profile.displayName} (${profile.role || 'user'})`;
         if (usernameTagElem) usernameTagElem.innerText = profile.usernameTag;
+        if (zhAddressElem) zhAddressElem.innerText = getZetaMailAddress(profile.usernameTag);
         
         if (profileImgElem) {
             profileImgElem.src = profile.imgprofile || "https://visage.surgeplay.com/face/64/Steve";
@@ -161,6 +238,8 @@ function updateUIWithProfile(profile) {
         if (textInput) { textInput.disabled = false; textInput.placeholder = "Scrivi qualcosa..."; }
         if (linkInput) { linkInput.disabled = false; linkInput.placeholder = "Incolla un link..."; }
         if (publishBtn) { publishBtn.disabled = false; publishBtn.style.opacity = "1"; publishBtn.style.cursor = "pointer"; }
+        
+        listenZetaMailMessages();
     } else {
         currentUserProfile = null;
         if (loggedBox) loggedBox.style.display = "none";
@@ -169,6 +248,7 @@ function updateUIWithProfile(profile) {
         if (textInput) { textInput.disabled = true; textInput.placeholder = "Accedi per pubblicare..."; }
         if (linkInput) linkInput.disabled = true;
         if (publishBtn) { publishBtn.disabled = true; publishBtn.style.opacity = "0.4"; }
+        if (zhAddressElem) zhAddressElem.innerText = "@zh.net";
     }
 
     listenCommunityPosts();
@@ -272,7 +352,6 @@ async function handleAuthSubmit() {
         return;
     }
 
-    // CONTROLLO CLOUDFLARE TURNSTILE
     const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]');
     if (!turnstileResponse || !turnstileResponse.value.trim()) {
         alert("⚠️ DEVI COMPLETARE LA VERIFICA DI CLOUDFLARE TURNSTILE PER CONTINUARE!");
@@ -475,7 +554,6 @@ async function openPublicProfile(userId) {
             }
         }
 
-        // CARICAMENTO ED ALLINAMENTO DIAMANTI
         let diamonds = data.diamonds || 0;
         if (currentUserProfile && currentUserProfile.uid === userId) {
             const localDiamonds = parseInt(localStorage.getItem('zetac_minigame_diamonds') || '0', 10);
@@ -491,6 +569,19 @@ async function openPublicProfile(userId) {
             if (emailContainer) emailContainer.style.display = 'block';
         } else {
             if (emailContainer) emailContainer.style.display = 'none';
+        }
+
+        // Tasto rapido per mandare ZetaMail dal profilo pubblico
+        const sendMailBtn = document.getElementById('pub-profile-send-mail-btn');
+        if (sendMailBtn) {
+            sendMailBtn.onclick = () => {
+                closePublicProfileModal();
+                switchTab('zetamail', 'ZETAMAIL', null);
+                const recipientField = document.getElementById('zetamail-recipient-input');
+                if (recipientField) {
+                    recipientField.value = getZetaMailAddress(data.usernameTag);
+                }
+            };
         }
 
         const modal = document.getElementById('public-profile-modal');
