@@ -97,7 +97,6 @@ function listenZetaMailMessages() {
     const myEmail = getZetaMailAddress(currentUserProfile.usernameTag);
     const myUid = currentUserProfile.uid;
 
-    // Ascoltiamo i messaggi filtrando per recipientEmail (funziona sia con tag completi che con UID)
     db.collection("private_messages")
         .where("recipientEmail", "==", myEmail)
         .orderBy("createdAt", "desc")
@@ -148,7 +147,6 @@ async function sendZetaMailMessage() {
         return;
     }
 
-    // Normalizzazione pulita dell'indirizzo destinatario (es. staff_zetacraft_hub@zh.net)
     let cleanRecipient = rawRecipient.replace('@', '');
     if (!cleanRecipient.endsWith('zh.net')) {
         cleanRecipient = cleanRecipient + '@zh.net';
@@ -306,12 +304,12 @@ function initAuthListener() {
             }
             updateUIWithProfile(profileData);
         } else {
-            checkDiscordSession();
+            checkExternalSessions();
         }
     });
 }
 
-function checkDiscordSession() {
+function checkExternalSessions() {
     const savedDiscordUser = localStorage.getItem('discord_user');
     if (savedDiscordUser) {
         try {
@@ -320,6 +318,16 @@ function checkDiscordSession() {
             return true;
         } catch(e) {
             localStorage.removeItem('discord_user');
+        }
+    }
+    const savedCustomUser = localStorage.getItem('custom_oauth_user');
+    if (savedCustomUser) {
+        try {
+            const user = JSON.parse(savedCustomUser);
+            updateUIWithProfile(user);
+            return true;
+        } catch(e) {
+            localStorage.removeItem('custom_oauth_user');
         }
     }
     updateUIWithProfile(null);
@@ -463,6 +471,11 @@ async function handleLogout() {
         window.location.reload();
         return;
     }
+    if (localStorage.getItem('custom_oauth_user')) {
+        localStorage.removeItem('custom_oauth_user');
+        window.location.reload();
+        return;
+    }
     if (auth) await auth.signOut();
 }
 
@@ -548,6 +561,9 @@ async function saveProfileSettings() {
         
         if (localStorage.getItem('discord_user')) {
             localStorage.setItem('discord_user', JSON.stringify(currentUserProfile));
+        }
+        if (localStorage.getItem('custom_oauth_user')) {
+            localStorage.setItem('custom_oauth_user', JSON.stringify(currentUserProfile));
         }
 
         updateUIWithProfile(currentUserProfile);
@@ -1185,51 +1201,164 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const fragment = new URLSearchParams(window.location.hash.slice(1));
     const accessToken = fragment.get('access_token');
+    const REDIRECT_URI = window.location.origin + "/";
 
     if (accessToken) {
         window.history.replaceState({}, document.title, window.location.pathname);
 
-        fetch('https://discord.com/api/users/@me', {
-            headers: { authorization: `Bearer ${accessToken}` },
-        })
-        .then(res => res.json())
-        .then(async (userData) => {
-            if (userData.id) {
-                const displayName = userData.global_name || userData.username;
-                const usernameTag = "@" + userData.username;
-                const avatarUrl = userData.avatar 
-                    ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
-                    : 'https://cdn.discordapp.com/embed/avatars/0.png';
-
-                const discordProfile = {
-                    uid: "discord_" + userData.id,
-                    displayName: displayName,
-                    usernameTag: usernameTag,
-                    imgprofile: avatarUrl,
-                    bannerUrl: getRandomHexColor(),
-                    bio: "",
-                    email: userData.email || "",
-                    showEmail: false,
-                    provider: 'discord',
-                    role: 'user',
-                    diamonds: 0
-                };
-
-                if (db) {
-                    try {
-                        const userDocRef = db.collection("users").doc(discordProfile.uid);
-                        await userDocRef.set({
-                            ...discordProfile,
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                        }, { merge: true });
-                    } catch (err) {}
+        // Controllo se il token arriva da Twitch
+        if (window.location.search.includes('twitch') || localStorage.getItem('auth_provider') === 'twitch') {
+            localStorage.removeItem('auth_provider');
+            fetch('https://api.twitch.tv/helix/users', {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Client-Id': 'kcgj8rq3rvreo55w78009zq6pydi5x'
                 }
+            })
+            .then(res => res.json())
+            .then(async (data) => {
+                if (data.data && data.data.length > 0) {
+                    const userData = data.data[0];
+                    const twitchProfile = {
+                        uid: "twitch_" + userData.id,
+                        displayName: userData.display_name,
+                        usernameTag: "@" + userData.login.toLowerCase(),
+                        imgprofile: userData.profile_image_url || 'https://visage.surgeplay.com/face/64/Steve',
+                        bannerUrl: getRandomHexColor(),
+                        bio: userData.description || "",
+                        email: userData.email || "",
+                        showEmail: false,
+                        provider: 'twitch',
+                        role: 'user',
+                        diamonds: 0
+                    };
+                    if (db) {
+                        try {
+                            await db.collection("users").doc(twitchProfile.uid).set({
+                                ...twitchProfile,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            }, { merge: true });
+                        } catch (err) {}
+                    }
+                    localStorage.setItem('custom_oauth_user', JSON.stringify(twitchProfile));
+                    updateUIWithProfile(twitchProfile);
+                }
+            }).catch(err => {});
+        } 
+        // Controllo se il token arriva da GitLab
+        else if (localStorage.getItem('auth_provider') === 'gitlab') {
+            localStorage.removeItem('auth_provider');
+            fetch('https://gitlab.com/api/v4/user', {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            })
+            .then(res => res.json())
+            .then(async (userData) => {
+                if (userData.id) {
+                    const gitlabProfile = {
+                        uid: "gitlab_" + userData.id,
+                        displayName: userData.name || userData.username,
+                        usernameTag: "@" + userData.username.toLowerCase(),
+                        imgprofile: userData.avatar_url || 'https://visage.surgeplay.com/face/64/Steve',
+                        bannerUrl: getRandomHexColor(),
+                        bio: userData.bio || "",
+                        email: userData.email || "",
+                        showEmail: false,
+                        provider: 'gitlab',
+                        role: 'user',
+                        diamonds: 0
+                    };
+                    if (db) {
+                        try {
+                            await db.collection("users").doc(gitlabProfile.uid).set({
+                                ...gitlabProfile,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            }, { merge: true });
+                        } catch (err) {}
+                    }
+                    localStorage.setItem('custom_oauth_user', JSON.stringify(gitlabProfile));
+                    updateUIWithProfile(gitlabProfile);
+                }
+            }).catch(err => {});
+        }
+        // Controllo se il token arriva da Figma
+        else if (localStorage.getItem('auth_provider') === 'figma') {
+            localStorage.removeItem('auth_provider');
+            fetch('https://api.figma.com/v1/me', {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            })
+            .then(res => res.json())
+            .then(async (userData) => {
+                if (userData.id) {
+                    const figmaProfile = {
+                        uid: "figma_" + userData.id,
+                        displayName: userData.handle || "Utente Figma",
+                        usernameTag: "@" + (userData.handle || "figma").toLowerCase().replace(/\s+/g, ''),
+                        imgprofile: userData.img_url || "https://visage.surgeplay.com/face/64/Steve",
+                        bannerUrl: getRandomHexColor(),
+                        bio: "",
+                        email: userData.email || "",
+                        showEmail: false,
+                        provider: 'figma',
+                        role: 'user',
+                        diamonds: 0
+                    };
+                    if (db) {
+                        try {
+                            await db.collection("users").doc(figmaProfile.uid).set({
+                                ...figmaProfile,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            }, { merge: true });
+                        } catch (err) {}
+                    }
+                    localStorage.setItem('custom_oauth_user', JSON.stringify(figmaProfile));
+                    updateUIWithProfile(figmaProfile);
+                }
+            }).catch(err => {});
+        }
+        // Altrimenti gestiamo Discord (default token fragment)
+        else {
+            fetch('https://discord.com/api/users/@me', {
+                headers: { authorization: `Bearer ${accessToken}` },
+            })
+            .then(res => res.json())
+            .then(async (userData) => {
+                if (userData.id) {
+                    const displayName = userData.global_name || userData.username;
+                    const usernameTag = "@" + userData.username;
+                    const avatarUrl = userData.avatar 
+                        ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
+                        : 'https://cdn.discordapp.com/embed/avatars/0.png';
 
-                localStorage.setItem('discord_user', JSON.stringify(discordProfile));
-                updateUIWithProfile(discordProfile);
-            }
-        })
-        .catch(err => {});
+                    const discordProfile = {
+                        uid: "discord_" + userData.id,
+                        displayName: displayName,
+                        usernameTag: usernameTag,
+                        imgprofile: avatarUrl,
+                        bannerUrl: getRandomHexColor(),
+                        bio: "",
+                        email: userData.email || "",
+                        showEmail: false,
+                        provider: 'discord',
+                        role: 'user',
+                        diamonds: 0
+                    };
+
+                    if (db) {
+                        try {
+                            const userDocRef = db.collection("users").doc(discordProfile.uid);
+                            await userDocRef.set({
+                                ...discordProfile,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            }, { merge: true });
+                        } catch (err) {}
+                    }
+
+                    localStorage.setItem('discord_user', JSON.stringify(discordProfile));
+                    updateUIWithProfile(discordProfile);
+                }
+            })
+            .catch(err => {});
+        }
     } else {
         initAuthListener();
     }
@@ -1239,6 +1368,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const authSubmitBtn = document.getElementById('auth-submit-btn');
     if (authSubmitBtn) authSubmitBtn.addEventListener('click', handleAuthSubmit);
+
+    // GESTIONE APERTURA / CHIUSURA MENU SOCIAL A COMPARSA
+    const toggleSocialMenuBtn = document.getElementById('toggle-social-menu-btn');
+    const socialButtonsContainer = document.getElementById('social-buttons-container');
+    const socialArrowIcon = document.getElementById('social-arrow-icon');
+
+    if (toggleSocialMenuBtn && socialButtonsContainer) {
+        toggleSocialMenuBtn.addEventListener('click', () => {
+            if (socialButtonsContainer.style.display === 'none' || socialButtonsContainer.style.display === '') {
+                socialButtonsContainer.style.display = 'flex';
+                if (socialArrowIcon) socialArrowIcon.innerText = '▲';
+            } else {
+                socialButtonsContainer.style.display = 'none';
+                if (socialArrowIcon) socialArrowIcon.innerText = '▼';
+            }
+        });
+    }
 
     const openProfileBtn = document.getElementById('open-profile-settings-btn');
     if (openProfileBtn) openProfileBtn.addEventListener('click', openProfileSettingsModal);
@@ -1266,13 +1412,41 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const DISCORD_CLIENT_ID = "1542912801004068866";
-    const REDIRECT_URI = window.location.origin + "/";
     const discordBtn = document.getElementById('login-discord-btn');
-
     if (discordBtn) {
         discordBtn.addEventListener('click', () => {
             const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=identify%20email`;
             window.location.href = discordAuthUrl;
+        });
+    }
+
+    // TWITCH LOGIN (Client ID: kcgj8rq3rvreo55w78009zq6pydi5x)
+    const twitchBtn = document.getElementById('login-twitch-btn');
+    if (twitchBtn) {
+        twitchBtn.addEventListener('click', () => {
+            localStorage.setItem('auth_provider', 'twitch');
+            const twitchAuthUrl = `https://id.twitch.tv/oauth2/authorize?client_id=kcgj8rq3rvreo55w78009zq6pydi5x&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=user:read:email`;
+            window.location.href = twitchAuthUrl;
+        });
+    }
+
+    // GITLAB LOGIN (Client ID: df0a115304055b3983475cfe16e63c2643c0df93a4b0cbb723f29c2e717867f2)
+    const gitlabBtn = document.getElementById('login-gitlab-btn');
+    if (gitlabBtn) {
+        gitlabBtn.addEventListener('click', () => {
+            localStorage.setItem('auth_provider', 'gitlab');
+            const gitlabAuthUrl = `https://gitlab.com/oauth/authorize?client_id=df0a115304055b3983475cfe16e63c2643c0df93a4b0cbb723f29c2e717867f2&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=read_user`;
+            window.location.href = gitlabAuthUrl;
+        });
+    }
+
+    // FIGMA LOGIN (Client ID: 4ygmaKf3sRfz7DWWW2HOXz)
+    const figmaBtn = document.getElementById('login-figma-btn');
+    if (figmaBtn) {
+        figmaBtn.addEventListener('click', () => {
+            localStorage.setItem('auth_provider', 'figma');
+            const figmaAuthUrl = `https://www.figma.com/oauth?client_id=4ygmaKf3sRfz7DWWW2HOXz&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=current_user:read&response_type=token`;
+            window.location.href = figmaAuthUrl;
         });
     }
 
