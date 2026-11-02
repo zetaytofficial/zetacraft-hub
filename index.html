@@ -240,28 +240,44 @@
 
                         <div style="display: flex; align-items: center; gap: 10px; margin: 8px 0;">
                             <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.2);"></div>
-                            <span style="font-size: 10px; color: #aaa;">oppure accedi con</span>
+                            <span style="font-size: 10px; color: #aaa;">oppure</span>
                             <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.2);"></div>
                         </div>
 
+                        <!-- MENU A TENDINA ACCEDI CON I SOCIAL -->
                         <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <button type="button" id="login-google-btn" class="liquid-btn social-btn" style="background: #db4437;">
-                                <img src="google.png" alt="Google" class="social-btn-logo" onerror="this.style.display='none'">
-                                <span>ACCEDI CON GOOGLE</span>
+                            <button type="button" id="toggle-social-menu-btn" class="liquid-btn" style="background: rgba(0,212,255,0.15); border: 1px solid rgba(0,212,255,0.4); font-size: 10px; padding: 10px; font-weight: bold; display: flex; justify-content: center; align-items: center; gap: 6px;">
+                                <span>🌐 ACCEDI CON I SOCIAL</span>
+                                <span id="social-arrow-icon">▼</span>
                             </button>
-                            <button type="button" id="login-github-btn" class="liquid-btn social-btn" style="background: #24292e;">
-                                <img src="github.png" alt="GitHub" class="social-btn-logo" onerror="this.style.display='none'">
-                                <span>ACCEDI CON GITHUB</span>
-                            </button>
-                            <button type="button" id="login-yahoo-btn" class="liquid-btn social-btn" style="background: #6001d2;">
-                                <img src="yahoo.png" alt="Yahoo" class="social-btn-logo" onerror="this.style.display='none'">
-                                <span>ACCEDI CON YAHOO</span>
-                            </button>
-                            <button type="button" id="login-discord-btn" class="liquid-btn social-btn" style="background: #5865F2;">
-                                <img src="discord.png" alt="Discord" class="social-btn-logo" onerror="this.style.display='none'">
-                                <span>ACCEDI CON DISCORD</span>
-                            </button>
+
+                            <div id="social-buttons-container" style="display: none; flex-direction: column; gap: 6px; margin-top: 4px; animation: fadeIn 0.2s ease;">
+                                <button type="button" id="login-google-btn" class="liquid-btn social-btn" style="background: #db4437;">
+                                    <img src="google.png" alt="Google" class="social-btn-logo" onerror="this.style.display='none'">
+                                    <span>ACCEDI CON GOOGLE</span>
+                                </button>
+                                <button type="button" id="login-github-btn" class="liquid-btn social-btn" style="background: #24292e;">
+                                    <img src="github.png" alt="GitHub" class="social-btn-logo" onerror="this.style.display='none'">
+                                    <span>ACCEDI CON GITHUB</span>
+                                </button>
+                                <button type="button" id="login-yahoo-btn" class="liquid-btn social-btn" style="background: #6001d2;">
+                                    <img src="yahoo.png" alt="Yahoo" class="social-btn-logo" onerror="this.style.display='none'">
+                                    <span>ACCEDI CON YAHOO</span>
+                                </button>
+                                <button type="button" id="login-discord-btn" class="liquid-btn social-btn" style="background: #5865F2;">
+                                    <img src="discord.png" alt="Discord" class="social-btn-logo" onerror="this.style.display='none'">
+                                    <span>ACCEDI CON DISCORD</span>
+                                </button>
+                                <!-- Predisposizione per altri loghi nel formato nomeazienda.png -->
+                                <!-- 
+                                <button type="button" id="login-nomeazienda-btn" class="liquid-btn social-btn" style="background: #colore;">
+                                    <img src="nomeazienda.png" alt="NomeAzienda" class="social-btn-logo" onerror="this.style.display='none'">
+                                    <span>ACCEDI CON NOMEAZIENDA</span>
+                                </button>
+                                -->
+                            </div>
                         </div>
+
                     </div>
 
                     <div style="display: flex; gap: 6px; margin-bottom: 15px;">
