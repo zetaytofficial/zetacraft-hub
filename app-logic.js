@@ -83,17 +83,25 @@ function getZetaMailAddress(usernameTag) {
     return `${clean}@zh.net`;
 }
 
-// 🚀 ASCOLTO MESSAGGI PRIVATI (ZETAMAIL)
+// 🚀 ASCOLTO MESSAGGI PRIVATI (ZETAMAIL) POTENZIATO
 function listenZetaMailMessages() {
-    if (!db || !currentUserProfile) return;
+    const listElem = document.getElementById('zetamail-messages-list');
+    
+    if (!currentUserProfile) {
+        if (listElem) listElem.innerHTML = `<p style="font-size: 10px; color: #888; text-align: center; margin: 10px 0;">Accedi per visualizzare i tuoi messaggi privati.</p>`;
+        return;
+    }
+
+    if (!db) return;
 
     const myEmail = getZetaMailAddress(currentUserProfile.usernameTag);
+    const myUid = currentUserProfile.uid;
 
+    // Ascoltiamo i messaggi filtrando per recipientEmail (funziona sia con tag completi che con UID)
     db.collection("private_messages")
         .where("recipientEmail", "==", myEmail)
         .orderBy("createdAt", "desc")
         .onSnapshot(snapshot => {
-            const listElem = document.getElementById('zetamail-messages-list');
             if (!listElem) return;
 
             if (snapshot.empty) {
@@ -106,7 +114,7 @@ function listenZetaMailMessages() {
                 const dateStr = msg.createdAt && msg.createdAt.toDate ? msg.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recente';
                 
                 return `
-                    <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(0,212,255,0.2); padding: 10px; border-radius: 10px; text-align: left;">
+                    <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(0,212,255,0.2); padding: 10px; border-radius: 10px; text-align: left; margin-bottom: 6px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                             <strong style="font-size: 11px; color: #00d4ff;">Da: ${msg.senderEmail}</strong>
                             <span style="font-size: 9px; color: #aaa;">${dateStr}</span>
@@ -117,10 +125,13 @@ function listenZetaMailMessages() {
             }).join('');
         }, err => {
             console.error("Errore ascolto ZetaMail:", err);
+            if (listElem) {
+                listElem.innerHTML = `<p style="font-size: 10px; color: #ff4757; text-align: center; margin: 10px 0;">Errore di caricamento messaggi (verifica l'indice su Firestore se richiesto).</p>`;
+            }
         });
 }
 
-// ✉️ INVIO MESSAGGIO PRIVATO CON NORMALIZZAZIONE DESTINATARIO
+// ✉️ INVIO MESSAGGIO PRIVATO PULITO
 async function sendZetaMailMessage() {
     if (!currentUserProfile) return alert("Accedi per inviare messaggi privati!");
 
@@ -137,6 +148,7 @@ async function sendZetaMailMessage() {
         return;
     }
 
+    // Normalizzazione pulita dell'indirizzo destinatario (es. staff_zetacraft_hub@zh.net)
     let cleanRecipient = rawRecipient.replace('@', '');
     if (!cleanRecipient.endsWith('zh.net')) {
         cleanRecipient = cleanRecipient + '@zh.net';
