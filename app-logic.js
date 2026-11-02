@@ -75,10 +75,11 @@ function getRandomHexColor() {
     return color;
 }
 
-// ✉️ GENERAZIONE EMAIL FITTIZIA @zh.net
+// ✉️ GENERAZIONE E NORMALIZZAZIONE EMAIL FITTIZIA @zh.net
 function getZetaMailAddress(usernameTag) {
     if (!usernameTag) return "utente@zh.net";
-    const clean = usernameTag.replace('@', '').toLowerCase().trim();
+    let clean = usernameTag.replace('@', '').toLowerCase().trim();
+    if (clean.endsWith('@zh.net')) return clean;
     return `${clean}@zh.net`;
 }
 
@@ -87,7 +88,6 @@ function listenZetaMailMessages() {
     if (!db || !currentUserProfile) return;
 
     const myEmail = getZetaMailAddress(currentUserProfile.usernameTag);
-    const myUid = currentUserProfile.uid;
 
     db.collection("private_messages")
         .where("recipientEmail", "==", myEmail)
@@ -120,7 +120,7 @@ function listenZetaMailMessages() {
         });
 }
 
-// ✉️ INVIO MESSAGGIO PRIVATO
+// ✉️ INVIO MESSAGGIO PRIVATO CON NORMALIZZAZIONE DESTINATARIO
 async function sendZetaMailMessage() {
     if (!currentUserProfile) return alert("Accedi per inviare messaggi privati!");
 
@@ -129,19 +129,19 @@ async function sendZetaMailMessage() {
 
     if (!recipientInput || !textInput) return;
 
-    let recipient = recipientInput.value.trim().toLowerCase();
+    let rawRecipient = recipientInput.value.trim().toLowerCase();
     const rawText = textInput.value.trim();
 
-    if (!recipient || !rawText) {
+    if (!rawRecipient || !rawText) {
         alert("Inserisci il destinatario e il testo del messaggio!");
         return;
     }
 
-    if (!recipient.includes('@')) {
-        recipient = '@' + recipient;
-    }
-    if (!recipient.endsWith('@zh.net')) {
-        recipient = recipient.replace('@', '') + '@zh.net';
+    let cleanRecipient = rawRecipient.replace('@', '');
+    if (!cleanRecipient.endsWith('zh.net')) {
+        cleanRecipient = cleanRecipient + '@zh.net';
+    } else if (!cleanRecipient.includes('@')) {
+        cleanRecipient = cleanRecipient.replace('zh.net', '@zh.net');
     }
 
     const text = await filterProfanity(rawText);
@@ -150,7 +150,7 @@ async function sendZetaMailMessage() {
         await db.collection("private_messages").add({
             senderUid: currentUserProfile.uid,
             senderEmail: getZetaMailAddress(currentUserProfile.usernameTag),
-            recipientEmail: recipient,
+            recipientEmail: cleanRecipient,
             text: text,
             read: false,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -376,6 +376,8 @@ async function handleAuthSubmit() {
             }
 
             if (!usernameTag.startsWith('@')) usernameTag = '@' + usernameTag;
+            usernameTag = usernameTag.toLowerCase();
+
             if (!imgprofile) imgprofile = `https://visage.surgeplay.com/face/64/${displayName.replace(/\s+/g, '')}`;
             if (!bannerUrl) bannerUrl = getRandomHexColor();
 
@@ -472,8 +474,9 @@ function closeProfileSettingsModal() {
     if (modal) modal.classList.add('hidden');
 }
 
+// ⚙️ SALVATAGGIO PROFILO CON CONTROLLO DUPLICATI TAG/@ZH.NET
 async function saveProfileSettings() {
-    if (!currentUserProfile || !auth) return;
+    if (!currentUserProfile || !auth || !db) return;
 
     const displayName = document.getElementById('edit-display-name').value.trim();
     let usernameTag = document.getElementById('edit-username-tag').value.trim();
@@ -490,9 +493,27 @@ async function saveProfileSettings() {
     }
 
     if (!usernameTag.startsWith('@')) usernameTag = '@' + usernameTag;
+    usernameTag = usernameTag.toLowerCase();
+
     if (!bannerUrl) bannerUrl = getRandomHexColor();
 
     try {
+        const checkQuery = await db.collection("users")
+            .where("usernameTag", "==", usernameTag)
+            .get();
+
+        let isTaken = false;
+        checkQuery.forEach(doc => {
+            if (doc.id !== currentUserProfile.uid) {
+                isTaken = true;
+            }
+        });
+
+        if (isTaken) {
+            alert("⚠️ Questo nome utente o indirizzo ZetaMail è già stato preso da un altro utente!");
+            return;
+        }
+
         const user = auth.currentUser;
         if (user && newPassword) {
             await user.updatePassword(newPassword);
@@ -512,6 +533,11 @@ async function saveProfileSettings() {
         await db.collection("users").doc(currentUserProfile.uid).update(updatedData);
 
         currentUserProfile = { ...currentUserProfile, ...updatedData };
+        
+        if (localStorage.getItem('discord_user')) {
+            localStorage.setItem('discord_user', JSON.stringify(currentUserProfile));
+        }
+
         updateUIWithProfile(currentUserProfile);
         closeProfileSettingsModal();
         alert("✅ Profilo aggiornato con successo!");
@@ -571,7 +597,6 @@ async function openPublicProfile(userId) {
             if (emailContainer) emailContainer.style.display = 'none';
         }
 
-        // Tasto rapido per mandare ZetaMail dal profilo pubblico
         const sendMailBtn = document.getElementById('pub-profile-send-mail-btn');
         if (sendMailBtn) {
             sendMailBtn.onclick = () => {
