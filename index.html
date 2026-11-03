@@ -57,6 +57,19 @@
                 <label style="font-size: 10px; color: #00d4ff;">Link Banner Profilo (Stile Discord)</label>
                 <input type="url" id="edit-banner-url" class="app-input" placeholder="https://... (lascia vuoto per colore casuale)">
 
+                <!-- UPLOAD CLOUDFLARE WORKER PER PROFILO -->
+                <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; border: 1px solid rgba(0,212,255,0.2); margin: 4px 0;">
+                    <label style="font-size: 10px; color: #00d4ff; font-weight: bold; display: block; margin-bottom: 6px;">📁 Carica Immagine Profilo / Banner</label>
+                    <select id="edit-upload-tipo" class="app-input" style="margin-bottom: 6px; background: #111; color: #fff; font-size: 10px;">
+                        <option value="logo">Logo Profilo</option>
+                        <option value="banner">Banner Profilo</option>
+                    </select>
+                    <input type="file" id="edit-upload-file" accept="image/*" style="width:100%; margin-bottom: 6px; font-size: 10px; color: #fff;">
+                    <input type="text" id="edit-upload-url" placeholder="Oppure URL immagine https://..." class="app-input" style="margin-bottom: 6px; font-size: 10px;">
+                    <button type="button" id="edit-btnUpload" class="liquid-btn" style="width: 100%; padding: 8px; font-size: 10px; font-weight:bold;">CARICA E IMPOSTA</button>
+                    <p id="edit-upload-status" style="margin-top:6px; font-size: 10px;"></p>
+                </div>
+
                 <label style="font-size: 10px; color: #00d4ff;">Bio / Informazioni</label>
                 <textarea id="edit-bio" class="app-input" rows="2" placeholder="Raccontaci qualcosa di te..." style="resize: none; font-family: inherit;"></textarea>
 
@@ -190,7 +203,7 @@
                 </div>
             </div>
 
-            <!-- SCHEDA 2: COMMUNITY POSTS -->
+            <!-- SCHEDA 2: COMMUNITY POSTS (CON REGISTRAZIONE E UPLOAD INTEGRATO) -->
             <div id="tab-posts" class="tab-panel">
                 <div class="link-bypass-box mc-options-box">
                     <h2 class="section-heading">💬 COMMUNITY POSTS</h2>
@@ -225,11 +238,24 @@
                             <button id="toggle-auth-mode-btn" type="button" style="background: none; border: none; color: #00d4ff; font-size: 10px; text-decoration: underline; cursor: pointer;">Non hai un account? Registrati</button>
                         </div>
                         
+                        <!-- CAMPI DI REGISTRAZIONE CON UPLOAD WORKER INTEGRATO -->
                         <div id="reg-fields" style="display: none; flex-direction: column; gap: 8px;">
                             <input type="text" id="auth-displayName-input" class="app-input" placeholder="Nome Visualizzato (es. Utente)">
                             <input type="text" id="auth-username-input" class="app-input" placeholder="Nome Utente con @ (es. @utente)">
-                            <input type="url" id="auth-imgprofile-input" class="app-input" placeholder="Link Immagine Profilo [opzionale]">
-                            <input type="url" id="auth-banner-input" class="app-input" placeholder="Link Banner Profilo (lascia vuoto per colore casuale)">
+                            <input type="url" id="auth-imgprofile-input" class="app-input" placeholder="Link Immagine Profilo (o carica sotto)">
+                            <input type="url" id="auth-banner-input" class="app-input" placeholder="Link Banner Profilo (o carica sotto)">
+
+                            <div style="background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(0,212,255,0.2);">
+                                <label style="font-size: 10px; color: #00d4ff; font-weight: bold; display: block; margin-bottom: 6px;">📁 Carica Logo o Banner in Registrazione</label>
+                                <select id="reg-upload-tipo" class="app-input" style="margin-bottom: 6px; background: #111; color: #fff; font-size: 10px;">
+                                    <option value="logo">Logo Profilo</option>
+                                    <option value="banner">Banner Profilo</option>
+                                </select>
+                                <input type="file" id="reg-upload-file" accept="image/*" style="width:100%; margin-bottom: 6px; font-size: 10px; color: #fff;">
+                                <input type="text" id="reg-upload-url" placeholder="Oppure URL immagine https://..." class="app-input" style="margin-bottom: 6px; font-size: 10px;">
+                                <button type="button" id="reg-btnUpload" class="liquid-btn" style="width: 100%; padding: 8px; font-size: 10px; font-weight:bold;">CARICA E APPLICA</button>
+                                <p id="reg-upload-status" style="margin-top:6px; font-size: 10px;"></p>
+                            </div>
                         </div>
 
                         <input type="email" id="auth-email-input" class="app-input" placeholder="Email (es. utente@mail.net)">
@@ -348,7 +374,6 @@
                     <span id="realtime-clock">00:00:00</span>
                 </div>
 
-                <!-- AVVISO CREDENZIALI SPOSTATE SU DISCORD -->
                 <div class="info-alert" style="background: rgba(0, 150, 255, 0.1); border: 1px solid rgba(0, 212, 255, 0.3);">
                     <div class="alert-body" style="font-size: 11px; line-height: 1.5; color: #fff; text-align: center;">
                         Per accendere il server usare le credenziali Ufficiali Aternos inserite nel server Discord Ufficiale
@@ -368,7 +393,6 @@
                 <div class="link-bypass-box">
                     <p>Unisciti alla nostra community per rimanere aggiornato e avviare il server:</p>
                     
-                    <!-- BOTTONE DISCORD AZZURRO/BLU CON LOGO.PNG -->
                     <a href="https://discord.gg/YJp2vkaK34" target="_blank" class="liquid-btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; text-align: center; box-sizing: border-box; margin-bottom: 10px; background: linear-gradient(135deg, #0077ff 0%, #00d4ff 100%); color: #fff; text-decoration: none; font-weight: bold; padding: 12px; border-radius: 12px;">
                         <img src="logo.png" alt="Logo Discord" style="width: 24px; height: 24px; object-fit: contain;" onerror="this.style.display='none'">
                         <span>ENTRA NEL SERVER DISCORD UFFICIALE</span>
@@ -438,31 +462,6 @@
 
                     <div class="options-divider"></div>
 
-                    <!-- FORM UPLOAD LOGO / BANNER ZETACRAFT -->
-                    <div style="max-width:100%; padding:15px; background:rgba(0,0,0,0.3); border-radius:12px; border:1px solid rgba(0,212,255,0.2); color:white; margin-bottom: 15px; text-align: left;">
-                        <h3 style="font-size: 12px; color: #00d4ff; margin-bottom: 10px;">📁 Carica Logo / Banner</h3>
-                        
-                        <input type="text" id="nome" placeholder="Nome Creator" class="app-input" style="margin-bottom: 10px;">
-                        
-                        <label style="font-size: 10px; color: #aaa;">Tipo di file:</label>
-                        <select id="tipo" class="app-input" style="margin: 4px 0 10px 0; background: #111; color: #fff;">
-                            <option value="logo">Logo</option>
-                            <option value="banner">Banner</option>
-                        </select>
-                        
-                        <label style="font-size: 10px; color: #aaa;">Da file:</label>
-                        <input type="file" id="file" accept="image/*" style="width:100%; margin:4px 0 10px 0; font-size: 10px; color: #fff;">
-                        
-                        <label style="font-size: 10px; color: #aaa;">Oppure da URL:</label>
-                        <input type="text" id="url" placeholder="https://..." class="app-input" style="margin-bottom: 10px;">
-                        
-                        <button id="btnUpload" class="liquid-btn" style="width: 100%; padding: 10px; font-size: 11px; font-weight:bold;">CARICA</button>
-                        
-                        <p id="status" style="margin-top:10px; font-size: 11px;"></p>
-                    </div>
-
-                    <div class="options-divider"></div>
-
                     <div class="setting-row">
                         <span class="setting-label">🛡️ Gestione Dati e Privacy</span>
                         <button id="open-data-modal-btn" class="liquid-btn setting-btn">GESTISCI DATI</button>
@@ -512,41 +511,79 @@
 
     </div>
 
+    <!-- SCRIPT GESTIONE UPLOAD WORKER (REGISTRAZIONE E PROFILO) -->
     <script>
     const WORKER_URL = "https://zetacraft-hub-upload.zetayt.workers.dev";
 
-    document.getElementById('btnUpload').addEventListener('click', async () => {
-        const nome = document.getElementById('nome').value.trim();
-        const tipo = document.getElementById('tipo').value;
-        const file = document.getElementById('file').files[0];
-        const url = document.getElementById('url').value.trim();
-        const status = document.getElementById('status');
-        
-        if (!nome) return status.innerText = "❌ Nome mancante!";
-        if (!file && !url) return status.innerText = "❌ File o URL mancante!";
-        
-        status.innerText = "⏳ Carico " + tipo + "...";
-        
+    // Funzione generica di upload per Worker
+    async function handleWorkerUpload(nomeInputId, tipoInputId, fileInputId, urlInputId, statusInputId, targetUrlInputId) {
+        const nomeElem = document.getElementById(nomeInputId);
+        const tipoElem = document.getElementById(tipoInputId);
+        const fileElem = document.getElementById(fileInputId);
+        const urlElem = document.getElementById(urlInputId);
+        const statusElem = document.getElementById(statusInputId);
+
+        if (!nomeElem || !nomeElem.value.trim()) {
+            if (statusElem) statusElem.innerText = "❌ Inserisci prima il nome utente/creator!";
+            return;
+        }
+
+        const nome = nomeElem.value.trim().replace('@', '');
+        const tipo = tipoElem ? tipoElem.value : 'logo';
+        const file = fileElem && fileElem.files ? fileElem.files[0] : null;
+        const url = urlElem ? urlElem.value.trim() : '';
+
+        if (!file && !url) {
+            if (statusElem) statusElem.innerText = "❌ Seleziona un file o inserisci un URL!";
+            return;
+        }
+
+        if (statusElem) statusElem.innerText = "⏳ Caricamento " + tipo + " in corso...";
+
         const formData = new FormData();
         formData.append('nome', nome);
         formData.append('tipo', tipo);
-        if (file) formData.append('file', file); else formData.append('url', url);
-        
+        if (file) formData.append('file', file);
+        else formData.append('url', url);
+
         try {
             const res = await fetch(WORKER_URL, { method: 'POST', body: formData });
             const text = await res.text();
             if (res.ok) {
-                status.innerText = "✅ Caricato: " + nome + "/" + tipo + ".webp";
-                document.getElementById('nome').value = "";
-                document.getElementById('file').value = "";
-                document.getElementById('url').value = "";
+                const finalImageUrl = `${WORKER_URL}/${nome}/${tipo}.webp`;
+                if (statusElem) statusElem.innerText = "✅ Caricato con successo!";
+                
+                const targetInput = document.getElementById(targetUrlInputId);
+                if (targetInput) {
+                    targetInput.value = finalImageUrl;
+                }
             } else {
-                status.innerText = "❌ " + text;
+                if (statusElem) statusElem.innerText = "❌ " + text;
             }
         } catch (e) {
-            status.innerText = "❌ Errore di rete: " + e.message;
+            if (statusElem) statusElem.innerText = "❌ Errore di rete: " + e.message;
         }
-    });
+    }
+
+    // Listener Upload in Registrazione
+    const regUploadBtn = document.getElementById('reg-btnUpload');
+    if (regUploadBtn) {
+        regUploadBtn.addEventListener('click', () => {
+            const tipo = document.getElementById('reg-upload-tipo').value;
+            const targetId = tipo === 'logo' ? 'auth-imgprofile-input' : 'auth-banner-input';
+            handleWorkerUpload('auth-displayName-input', 'reg-upload-tipo', 'reg-upload-file', 'reg-upload-url', 'reg-upload-status', targetId);
+        });
+    }
+
+    // Listener Upload in Modifica Profilo
+    const editUploadBtn = document.getElementById('edit-btnUpload');
+    if (editUploadBtn) {
+        editUploadBtn.addEventListener('click', () => {
+            const tipo = document.getElementById('edit-upload-tipo').value;
+            const targetId = tipo === 'logo' ? 'edit-img-profile' : 'edit-banner-url';
+            handleWorkerUpload('edit-display-name', 'edit-upload-tipo', 'edit-upload-file', 'edit-upload-url', 'edit-upload-status', targetId);
+        });
+    }
     </script>
 
     <script src="app-logic.js"></script>
