@@ -511,80 +511,103 @@
 
     </div>
 
-    <!-- SCRIPT GESTIONE UPLOAD WORKER (REGISTRAZIONE E PROFILO) -->
     <script>
-    const WORKER_URL = "https://zetacraft-hub-upload.zetayt.workers.dev";
+const WORKER_URL = "https://zetacraft-hub-upload.zetayt.workers.dev";
 
-    // Funzione generica di upload per Worker
-    async function handleWorkerUpload(nomeInputId, tipoInputId, fileInputId, urlInputId, statusInputId, targetUrlInputId) {
-        const nomeElem = document.getElementById(nomeInputId);
-        const tipoElem = document.getElementById(tipoInputId);
-        const fileElem = document.getElementById(fileInputId);
-        const urlElem = document.getElementById(urlInputId);
-        const statusElem = document.getElementById(statusInputId);
+// FUNZIONE NUOVA: Comprime in webp
+async function compressImage(file, tipo) {
+  const maxWidth = tipo === 'banner' ? 1500 : 500;
+  const quality = 0.8;
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxWidth / bitmap.width);
+  const w = Math.round(bitmap.width * scale);
+  const h = Math.round(bitmap.height * scale);
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+  const blob = await new Promise(r => canvas.toBlob(r, 'image/webp', quality));
+  return blob;
+}
 
-        if (!nomeElem || !nomeElem.value.trim()) {
-            if (statusElem) statusElem.innerText = "❌ Inserisci prima il nome utente/creator!";
-            return;
-        }
+// Funzione generale di upload per Worker
+async function handleWorkerUpload(nameId, tipoId, fileInputId, urlInputId, statusInputId, targetUrlInputId) {
+  const nameElem = document.getElementById(nameId);
+  const tipoElem = document.getElementById(tipoId);
+  const fileElem = document.getElementById(fileInputId);
+  const urlElem = document.getElementById(urlInputId);
+  const statusElem = document.getElementById(statusInputId);
 
-        const nome = nomeElem.value.trim().replace('@', '');
-        const tipo = tipoElem ? tipoElem.value : 'logo';
-        const file = fileElem && fileElem.files ? fileElem.files[0] : null;
-        const url = urlElem ? urlElem.value.trim() : '';
+  if (!nameElem || !nameElem.value.trim()) {
+    if (statusElem) statusElem.innerText = "❌ Inserisci prima il nome utente/creator!";
+    return;
+  }
 
-        if (!file && !url) {
-            if (statusElem) statusElem.innerText = "❌ Seleziona un file o inserisci un URL!";
-            return;
-        }
+  const nome = nameElem.value.trim().replace(' ', '');
+  const tipo = tipoElem ? tipoElem.value : 'logo';
+  const file = fileElem && fileElem.files[0] ? fileElem.files[0] : null;
+  const url = urlElem ? urlElem.value.trim() : '';
 
-        if (statusElem) statusElem.innerText = "⏳ Caricamento " + tipo + " in corso...";
+  if (!file && !url) {
+    if (statusElem) statusElem.innerText = "❌ Seleziona un file o inserisci un URL!";
+    return;
+  }
 
-        const formData = new FormData();
-        formData.append('nome', nome);
-        formData.append('tipo', tipo);
-        if (file) formData.append('file', file);
-        else formData.append('url', url);
+  if (statusElem) statusElem.innerText = "📦 Caricamento " + tipo + " in corso...";
 
-        try {
-            const res = await fetch(WORKER_URL, { method: 'POST', body: formData });
-            const text = await res.text();
-            if (res.ok) {
-                const finalImageUrl = `${WORKER_URL}/${nome}/${tipo}.webp`;
-                if (statusElem) statusElem.innerText = "✅ Caricato con successo!";
-                
-                const targetInput = document.getElementById(targetUrlInputId);
-                if (targetInput) {
-                    targetInput.value = finalImageUrl;
-                }
-            } else {
-                if (statusElem) statusElem.innerText = "❌ " + text;
-            }
-        } catch (e) {
-            if (statusElem) statusElem.innerText = "❌ Errore di rete: " + e.message;
-        }
+  const formData = new FormData();
+  formData.append('nome', nome);
+  formData.append('tipo', tipo);
+
+  if (file) {
+    // QUI COMPRIME
+    if (statusElem) statusElem.innerText = "📦 Compressione in corso...";
+    const compressed = await compressImage(file, tipo);
+    formData.append('file', compressed, `${tipo}.webp`);
+  } else {
+    formData.append('url', url);
+  }
+
+  try {
+    const res = await fetch(WORKER_URL, { method: 'POST', body: formData });
+    const text = await res.text();
+    if (res.ok) {
+      const finalImageUrl = `https://raw.githubusercontent.com/zetaytofficial/zetacraft-hub-upload/main/${nome}/${tipo}.webp`;
+      if (statusElem) statusElem.innerText = "✅ Caricato con successo!";
+      
+      const targetInput = document.getElementById(targetUrlInputId);
+      if (targetInput) {
+        targetInput.value = finalImageUrl;
+      }
+    } else {
+      if (statusElem) statusElem.innerText = "❌ " + text;
     }
+  } catch (e) {
+    if (statusElem) statusElem.innerText = "❌ Errore di rete: " + e.message;
+  }
+}
 
-    // Listener Upload in Registrazione
-    const regUploadBtn = document.getElementById('reg-btnUpload');
-    if (regUploadBtn) {
-        regUploadBtn.addEventListener('click', () => {
-            const tipo = document.getElementById('reg-upload-tipo').value;
-            const targetId = tipo === 'logo' ? 'auth-imgprofile-input' : 'auth-banner-input';
-            handleWorkerUpload('auth-displayName-input', 'reg-upload-tipo', 'reg-upload-file', 'reg-upload-url', 'reg-upload-status', targetId);
-        });
-    }
+// Listener Upload in Registrazione
+const regUploadBtn = document.getElementById('reg-btnUpload');
+if (regUploadBtn) {
+  regUploadBtn.addEventListener('click', () => {
+    const tipo = document.getElementById('reg-upload-tipo').value;
+    const targetId = tipo === 'logo' ? 'auth-imgprofile-input' : 'auth-banner-input';
+    handleWorkerUpload('auth-displayName-input', 'reg-upload-tipo', 'reg-upload-file', 'reg-upload-url', 'reg-upload-status', targetId);
+  });
+}
 
-    // Listener Upload in Modifica Profilo
-    const editUploadBtn = document.getElementById('edit-btnUpload');
-    if (editUploadBtn) {
-        editUploadBtn.addEventListener('click', () => {
-            const tipo = document.getElementById('edit-upload-tipo').value;
-            const targetId = tipo === 'logo' ? 'edit-img-profile' : 'edit-banner-url';
-            handleWorkerUpload('edit-display-name', 'edit-upload-tipo', 'edit-upload-file', 'edit-upload-url', 'edit-upload-status', targetId);
-        });
-    }
-    </script>
+// Listener Upload in Modifica Profilo
+const editUploadBtn = document.getElementById('edit-btnUpload');
+if (editUploadBtn) {
+  editUploadBtn.addEventListener('click', () => {
+    const tipo = document.getElementById('edit-upload-tipo').value;
+    const targetId = tipo === 'logo' ? 'edit-imgprofile-input' : 'edit-banner-input';
+    handleWorkerUpload('edit-display-name', 'edit-upload-tipo', 'edit-upload-file', 'edit-upload-url', 'edit-upload-status', targetId);
+  });
+}
+</script>
+
 
     <script src="app-logic.js"></script>
 
