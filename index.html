@@ -14,6 +14,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+</head>
+<body>
 
     <!-- POP-UP BENVENUTO E GESTIONE DATI CON ACCETTA / RIFIUTA -->
     <div id="welcome-modal" class="modal-overlay hidden">
@@ -346,11 +348,10 @@
                     <span id="realtime-clock">00:00:00</span>
                 </div>
 
-                <div class="info-alert">
-                    <div class="alert-header">📢 CREDENZIALI DI ACCENSIONE ATERNOS</div>
-                    <div class="alert-body">
-                        👤 USERNAME: <span class="code-text">FanDiZeta</span><br>
-                        🔑 PASSWORD: <span class="code-text">fandizeta_zetacraft$2026</span>
+                <!-- AVVISO CREDENZIALI SPOSTATE SU DISCORD -->
+                <div class="info-alert" style="background: rgba(0, 150, 255, 0.1); border: 1px solid rgba(0, 212, 255, 0.3);">
+                    <div class="alert-body" style="font-size: 11px; line-height: 1.5; color: #fff; text-align: center;">
+                        Per accendere il server usare le credenziali Ufficiali Aternos inserite nel server Discord Ufficiale
                     </div>
                 </div>
 
@@ -365,8 +366,13 @@
                 </div>
 
                 <div class="link-bypass-box">
-                    <p>Per accendere il server, clicca il pulsante qui sotto ed inserisci le credenziali scritte in alto!</p>
-                    <a href="https://aternos.org/servers/" target="_blank" class="liquid-btn" style="width: 100%; display: block; text-align: center; box-sizing: border-box; margin-bottom: 10px;">🔋 APRI PANNELLO DI ACCENSIONE</a>
+                    <p>Unisciti alla nostra community per rimanere aggiornato e avviare il server:</p>
+                    
+                    <!-- BOTTONE DISCORD AZZURRO/BLU CON LOGO.PNG -->
+                    <a href="https://discord.gg/YJp2vkaK34" target="_blank" class="liquid-btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; text-align: center; box-sizing: border-box; margin-bottom: 10px; background: linear-gradient(135deg, #0077ff 0%, #00d4ff 100%); color: #fff; text-decoration: none; font-weight: bold; padding: 12px; border-radius: 12px;">
+                        <img src="logo.png" alt="Logo Discord" style="width: 24px; height: 24px; object-fit: contain;" onerror="this.style.display='none'">
+                        <span>ENTRA NEL SERVER DISCORD UFFICIALE</span>
+                    </a>
                     
                     <button id="open-minigame-btn" class="liquid-btn" style="width: 100%; text-align: center; box-sizing: border-box; background: linear-gradient(135deg, #00c853 0%, #009688 100%); cursor: pointer;">
                         🎮 PROVA UN MINIGIOCO
@@ -432,6 +438,31 @@
 
                     <div class="options-divider"></div>
 
+                    <!-- FORM UPLOAD LOGO / BANNER ZETACRAFT -->
+                    <div style="max-width:100%; padding:15px; background:rgba(0,0,0,0.3); border-radius:12px; border:1px solid rgba(0,212,255,0.2); color:white; margin-bottom: 15px; text-align: left;">
+                        <h3 style="font-size: 12px; color: #00d4ff; margin-bottom: 10px;">📁 Carica Logo / Banner</h3>
+                        
+                        <input type="text" id="nome" placeholder="Nome Creator" class="app-input" style="margin-bottom: 10px;">
+                        
+                        <label style="font-size: 10px; color: #aaa;">Tipo di file:</label>
+                        <select id="tipo" class="app-input" style="margin: 4px 0 10px 0; background: #111; color: #fff;">
+                            <option value="logo">Logo</option>
+                            <option value="banner">Banner</option>
+                        </select>
+                        
+                        <label style="font-size: 10px; color: #aaa;">Da file:</label>
+                        <input type="file" id="file" accept="image/*" style="width:100%; margin:4px 0 10px 0; font-size: 10px; color: #fff;">
+                        
+                        <label style="font-size: 10px; color: #aaa;">Oppure da URL:</label>
+                        <input type="text" id="url" placeholder="https://..." class="app-input" style="margin-bottom: 10px;">
+                        
+                        <button id="btnUpload" class="liquid-btn" style="width: 100%; padding: 10px; font-size: 11px; font-weight:bold;">CARICA</button>
+                        
+                        <p id="status" style="margin-top:10px; font-size: 11px;"></p>
+                    </div>
+
+                    <div class="options-divider"></div>
+
                     <div class="setting-row">
                         <span class="setting-label">🛡️ Gestione Dati e Privacy</span>
                         <button id="open-data-modal-btn" class="liquid-btn setting-btn">GESTISCI DATI</button>
@@ -480,6 +511,43 @@
         </nav>
 
     </div>
+
+    <script>
+    const WORKER_URL = "https://zetacraft-hub-upload.zetayt.workers.dev";
+
+    document.getElementById('btnUpload').addEventListener('click', async () => {
+        const nome = document.getElementById('nome').value.trim();
+        const tipo = document.getElementById('tipo').value;
+        const file = document.getElementById('file').files[0];
+        const url = document.getElementById('url').value.trim();
+        const status = document.getElementById('status');
+        
+        if (!nome) return status.innerText = "❌ Nome mancante!";
+        if (!file && !url) return status.innerText = "❌ File o URL mancante!";
+        
+        status.innerText = "⏳ Carico " + tipo + "...";
+        
+        const formData = new FormData();
+        formData.append('nome', nome);
+        formData.append('tipo', tipo);
+        if (file) formData.append('file', file); else formData.append('url', url);
+        
+        try {
+            const res = await fetch(WORKER_URL, { method: 'POST', body: formData });
+            const text = await res.text();
+            if (res.ok) {
+                status.innerText = "✅ Caricato: " + nome + "/" + tipo + ".webp";
+                document.getElementById('nome').value = "";
+                document.getElementById('file').value = "";
+                document.getElementById('url').value = "";
+            } else {
+                status.innerText = "❌ " + text;
+            }
+        } catch (e) {
+            status.innerText = "❌ Errore di rete: " + e.message;
+        }
+    });
+    </script>
 
     <script src="app-logic.js"></script>
 
