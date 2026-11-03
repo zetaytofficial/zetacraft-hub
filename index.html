@@ -51,15 +51,13 @@
                 <label style="font-size: 10px; color: #00d4ff;">Nome Utente (@tag)</label>
                 <input type="text" id="edit-username-tag" class="app-input" placeholder="@utente">
 
-                <label style="font-size: 10px; color: #00d4ff;">Link Immagine Profilo (Avatar)</label>
-                <input type="url" id="edit-img-profile" class="app-input" placeholder="https://...">
-
-                <label style="font-size: 10px; color: #00d4ff;">Link Banner Profilo (Stile Discord)</label>
-                <input type="url" id="edit-banner-url" class="app-input" placeholder="https://... (lascia vuoto per colore casuale)">
+                <!-- Campi nascosti per i link gestiti dal sistema di upload -->
+                <input type="hidden" id="edit-img-profile">
+                <input type="hidden" id="edit-banner-url">
 
                 <!-- UPLOAD CLOUDFLARE WORKER PER PROFILO -->
                 <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; border: 1px solid rgba(0,212,255,0.2); margin: 4px 0;">
-                    <label style="font-size: 10px; color: #00d4ff; font-weight: bold; display: block; margin-bottom: 6px;">📁 Carica Immagine Profilo / Banner</label>
+                    <label style="font-size: 10px; color: #00d4ff; font-weight: bold; display: block; margin-bottom: 6px;">📁 Gestione Immagine Profilo / Banner</label>
                     <select id="edit-upload-tipo" class="app-input" style="margin-bottom: 6px; background: #111; color: #fff; font-size: 10px;">
                         <option value="logo">Logo Profilo</option>
                         <option value="banner">Banner Profilo</option>
@@ -242,8 +240,10 @@
                         <div id="reg-fields" style="display: none; flex-direction: column; gap: 8px;">
                             <input type="text" id="auth-displayName-input" class="app-input" placeholder="Nome Visualizzato (es. Utente)">
                             <input type="text" id="auth-username-input" class="app-input" placeholder="Nome Utente con @ (es. @utente)">
-                            <input type="url" id="auth-imgprofile-input" class="app-input" placeholder="Link Immagine Profilo (o carica sotto)">
-                            <input type="url" id="auth-banner-input" class="app-input" placeholder="Link Banner Profilo (o carica sotto)">
+                            
+                            <!-- Campi nascosti per i link in registrazione -->
+                            <input type="hidden" id="auth-imgprofile-input">
+                            <input type="hidden" id="auth-banner-input">
 
                             <div style="background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(0,212,255,0.2);">
                                 <label style="font-size: 10px; color: #00d4ff; font-weight: bold; display: block; margin-bottom: 6px;">📁 Carica Logo o Banner in Registrazione</label>
@@ -511,10 +511,11 @@
 
     </div>
 
-    <script>
+
+   <script>
 const WORKER_URL = "https://zetacraft-hub-upload.zetayt.workers.dev";
 
-// FUNZIONE NUOVA: Comprime in webp
+// Funzione di compressione webp
 async function compressImage(file, tipo) {
   const maxWidth = tipo === 'banner' ? 1500 : 500;
   const quality = 0.8;
@@ -560,7 +561,6 @@ async function handleWorkerUpload(nameId, tipoId, fileInputId, urlInputId, statu
   formData.append('tipo', tipo);
 
   if (file) {
-    // QUI COMPRIME
     if (statusElem) statusElem.innerText = "📦 Compressione in corso...";
     const compressed = await compressImage(file, tipo);
     formData.append('file', compressed, `${tipo}.webp`);
@@ -602,12 +602,11 @@ const editUploadBtn = document.getElementById('edit-btnUpload');
 if (editUploadBtn) {
   editUploadBtn.addEventListener('click', () => {
     const tipo = document.getElementById('edit-upload-tipo').value;
-    const targetId = tipo === 'logo' ? 'edit-imgprofile-input' : 'edit-banner-input';
+    const targetId = tipo === 'logo' ? 'edit-img-profile' : 'edit-banner-url';
     handleWorkerUpload('edit-display-name', 'edit-upload-tipo', 'edit-upload-file', 'edit-upload-url', 'edit-upload-status', targetId);
   });
 }
 </script>
-
 
     <script src="app-logic.js"></script>
 
