@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ApexLock // True Password Generator</title>
+    <style>
+        body { background-color: #0d0f12; color: #00ff66; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        .container { background-color: #14181f; border: 2px solid #00ff66; box-shadow: 0 0 20px rgba(0,255,102,0.2); padding: 25px; border-radius: 8px; text-align: center; max-width: 520px; width: 90%; }
+        .brand-logo { width: 100px; height: auto; margin-bottom: 10px; filter: drop-shadow(0 0 8px rgba(0,255,102,0.5)); }
+        h1 { font-size: 1.8rem; margin: 0 0 5px 0; letter-spacing: 2px; text-shadow: 0 0 8px rgba(0,255,102,0.6); }
+        .subtitle { color: #8892b0; font-size: 0.85rem; margin-bottom: 20px; }
+        .form-group { margin-bottom: 12px; text-align: left; font-size: 0.85rem; }
+        label { display: block; margin-bottom: 5px; color: #8892b0; font-weight: bold; }
+        input[type="text"], select { background-color: #0d0f12; border: 1px solid #00ff66; color: #00ff66; padding: 10px; font-family: inherit; width: 100%; border-radius: 4px; outline: none; box-sizing: border-box; font-size: 0.95rem; }
+        .btn-container { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
+        button { background-color: #00ff66; color: #0d0f12; border: none; padding: 10px 18px; font-family: inherit; font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.2s; font-size: 0.85rem; letter-spacing: 1px; }
+        button:hover { background-color: #ffffff; box-shadow: 0 0 12px #00ff66; }
+        button.btn-secondary { background-color: #1a2332; color: #00ff66; border: 1px solid #00ff66; }
+        .result-box { margin-top: 20px; padding: 12px; background-color: #0d0f12; border-left: 4px solid #00ff66; text-align: left; display: none; font-size: 0.8rem; line-height: 1.5; }
+        .password-display-wrapper { display: flex; gap: 8px; margin-top: 8px; }
+        .password-display { font-size: 1.05rem; color: #ffffff; font-weight: bold; background: #1a2332; padding: 8px; border-radius: 4px; text-align: center; border: 1px dashed #00ff66; letter-spacing: 1.5px; word-break: break-all; flex-grow: 1; }
+        .btn-copy { background-color: #00ff66; color: #0d0f12; padding: 8px 12px; font-size: 0.8rem; margin-top: 0; }
+        .loading { color: #8892b0; font-style: italic; }
+        .terminal-footer { margin-top: 25px; font-size: 0.85rem; border-top: 1px dashed #1e293b; padding-top: 15px; }
+        .credits-link { color: #00ff66; text-decoration: none; font-weight: bold; text-shadow: 0 0 5px rgba(0,255,102,0.4); transition: 0.2s; }
+        .credits-link:hover { color: #ffffff; text-shadow: 0 0 10px #00ff66; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <img src="logo.png" alt="ApexLock Logo" class="brand-logo">
+    <h1>APEXLOCK // PRO</h1><div class="subtitle">[ SYSTEM STATUS: SECURE PASSWORD GENERATOR ]</div>
+    <div class="form-group"><label for="passLength">LUNGHEZZA PASSWORD TARGET:</label><select id="passLength"><option value="8">8 Caratteri (Sicurezza Base)</option><option value="12" selected>12 Caratteri (Consigliata)</option><option value="16">16 Caratteri (Alta Sicurezza)</option><option value="20">20 Caratteri (Livello Cloud)</option><option value="24">24 Caratteri (Massima Sicurezza Militare)</option></select></div>
+    <div class="form-group"><label for="customSymbols">CARATTERI SPECIALI DA INCLUDERE (Lascia vuoto per escluderli):</label><input type="text" id="customSymbols" value="!@#_-\$%*" placeholder="Solo lettere e numeri"></div>
+    <div class="btn-container"><button type="button" onclick="generaPasswordVera()">GENERA CHIAVE SICURA</button><button type="button" class="btn-secondary" onclick="resetForm()">PULISCI CONSOLE</button></div>
+    <div class="result-box" id="outputConsole"></div>
+    <div class="terminal-footer"><a href="https://linktr.ee/zetayt_" target="_blank" class="credits-link">Created By ZetaYT</a></div>
+</div>
+<script>
+function generaPasswordVera() {
+    const lengthSelect = document.getElementById('passLength'); const symbolsInput = document.getElementById('customSymbols'); const outputBox = document.getElementById('outputConsole');
+    let lunghezzaTarget = parseInt(lengthSelect.value); let caratteriSpeciali = symbolsInput.value.trim();
+    outputBox.style.display = "block"; outputBox.innerHTML = `<span class="loading">> GENERANDO CHIAVE AD ALTA ENTROPIA...</span>`;
+    const lettereMinuscole = "abcdefghijklmnopqrstuvwxyz"; const lettereMaiuscole = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"; const numeri = "0123456789";
+    let poolTotale = lettereMinuscole + lettereMaiuscole + numeri; if (caratteriSpeciali.length > 0) { poolTotale += caratteriSpeciali; }
+    let passwordGenerata = "";
+    for (let i = 0; i < lunghezzaTarget; i++) { passwordGenerata += poolTotale.charAt(Math.floor(Math.random() * poolTotale.length)); }
+    setTimeout(() => { outputBox.innerHTML = `<strong>ALGORITMO:</strong> RANDOM_ENTROPY_GEN // MASSIMA SICUREZZA<br><strong>LUNGHEZZA EFFETTIVA:</strong> ${lunghezzaTarget} CARATTERI<br><strong>CHIAVE REALE GENERATA:</strong><div class="password-display-wrapper"><div class="password-display" id="finalPass">${passwordGenerata}</div><button type="button" class="btn-copy" id="copyBtn" onclick="copiaPassword()">COPIA</button></div>`; }, 350);
+}
+function copiaPassword() {
+    const passwordTesto = document.getElementById('finalPass').innerText; const btnCopia = document.getElementById('copyBtn');
+    if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(passwordTesto).then(() => { applicaEffettoCopiato(btnCopia); }).catch(() => { eseguiCopiaFallback(passwordTesto, btnCopia); }); }
+    else { eseguiCopiaFallback(passwordTesto, btnCopia); }
+}
+function eseguiCopiaFallback(testo, bottone) {
+    const elementoTemporaneo = document.createElement("textarea"); elementoTemporaneo.value = testo; elementoTemporaneo.style.position = "fixed"; document.body.appendChild(elementoTemporaneo); elementoTemporaneo.select();
+    try { document.execCommand("copy"); applicaEffettoCopiato(bottone); } catch { alert("Impossibile copiare."); } document.body.removeChild(elementoTemporaneo);
+}
+function applicaEffettoCopiato(bottone) { bottone.innerText = "COPIATO!"; bottone.style.backgroundColor = "#ffffff"; bottone.style.color = "#0d0f12"; setTimeout(() => { bottone.innerText = "COPIA"; bottone.style.backgroundColor = "#00ff66"; bottone.style.color = "#0d0f12"; }, 1500); }
+function resetForm() { document.getElementById('outputConsole').style.display = "none"; document.getElementById('outputConsole').innerHTML = ""; }
+</script>
+</body>
+</html>
