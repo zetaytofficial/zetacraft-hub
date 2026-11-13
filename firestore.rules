@@ -29,15 +29,29 @@ service cloud.firestore {
         && request.resource.data.get('diamonds', 0) == 0
         && request.resource.data.keys().hasOnly([
           'displayName', 'usernameTag', 'imgprofile', 'bannerUrl', 'bio',
-          'email', 'showEmail', 'role', 'diamonds', 'consent',
+          'role', 'diamonds',
           'createdAt', 'updatedAt', 'provider'
         ]);
 
       allow update: if owns(userId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'displayName', 'usernameTag', 'imgprofile', 'bannerUrl',
-          'bio', 'email', 'showEmail', 'updatedAt'
-        ]);
+        && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'displayName', 'usernameTag', 'imgprofile', 'bannerUrl', 'bio', 'updatedAt'
+          ])
+          || (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'email', 'showEmail'
+            ])
+            && !request.resource.data.keys().hasAny(['email', 'showEmail'])
+          )
+          || (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'displayName', 'usernameTag', 'imgprofile', 'bannerUrl', 'bio',
+              'updatedAt', 'email', 'showEmail'
+            ])
+            && !request.resource.data.keys().hasAny(['email', 'showEmail'])
+          )
+        );
 
       allow delete: if false;
 
@@ -51,14 +65,51 @@ service cloud.firestore {
       }
     }
 
+    match /private_users/{userId} {
+      allow read: if owns(userId);
+      allow create, update: if owns(userId)
+        && request.resource.data.keys().hasOnly(['email', 'consent', 'updatedAt'])
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 320
+        && (!request.resource.data.keys().hasAny(['consent'])
+          || request.resource.data.consent is map);
+      allow delete: if false;
+    }
+
+    match /public_contact_emails/{userId} {
+      allow read: if true;
+      allow create, update: if owns(userId)
+        && request.resource.data.keys().hasOnly(['email', 'updatedAt'])
+        && request.resource.data.email is string
+        && request.resource.data.email.size() > 0
+        && request.resource.data.email.size() <= 320;
+      allow delete: if owns(userId);
+    }
+
     match /posts/{postId} {
       allow read: if true;
 
       allow create: if signedIn()
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.get('role', 'user') == (staff() ? request.auth.token.role : 'user')
+        && request.resource.data.get('authorName', '') is string
+        && request.resource.data.get('authorName', '').size() > 0
+        && request.resource.data.get('authorName', '').size() <= 80
+        && request.resource.data.get('usernameTag', '') is string
+        && request.resource.data.get('usernameTag', '').size() <= 40
+        && request.resource.data.get('imgprofile', '') is string
+        && request.resource.data.get('imgprofile', '').size() <= 2048
         && request.resource.data.get('text', '') is string
+        && request.resource.data.get('text', '').size() <= 5000
         && request.resource.data.get('mediaUrl', '') is string
+        && request.resource.data.get('mediaUrl', '').size() <= 2048
+        && request.resource.data.get('mediaType', 'none') in [
+          'none', 'youtube', 'image', 'audio', 'spotify', 'link'
+        ]
+        && request.resource.data.get('likeCount', 0) == 0
+        && request.resource.data.get('likes', {}) is map
+        && request.resource.data.get('likes', {}).size() == 0
+        && request.resource.data.get('reports', 0) == 0
         && request.resource.data.keys().hasOnly([
           'authorId', 'authorName', 'usernameTag', 'imgprofile', 'role',
           'text', 'mediaUrl', 'mediaType', 'likeCount', 'likes',
@@ -74,10 +125,15 @@ service cloud.firestore {
             && request.resource.data.get('likes', {}) is map
             && request.resource.data.get('likes', {}).diff(resource.data.get('likes', {}))
               .affectedKeys().hasOnly([request.auth.uid])
+            && request.resource.data.get('likes', {}).get(request.auth.uid, false) is bool
+            && resource.data.get('likes', {}).get(request.auth.uid, false) is bool
+            && request.resource.data.get('likes', {}).get(request.auth.uid, false)
+              != resource.data.get('likes', {}).get(request.auth.uid, false)
             && request.resource.data.likeCount is int
             && request.resource.data.likeCount >= 0
-            && request.resource.data.likeCount <= resource.data.get('likeCount', 0) + 1
-            && request.resource.data.likeCount >= resource.data.get('likeCount', 0) - 1
+            && request.resource.data.likeCount
+              == resource.data.get('likeCount', 0)
+                + (request.resource.data.get('likes', {}).get(request.auth.uid, false) ? 1 : -1)
           )
           ||
           (

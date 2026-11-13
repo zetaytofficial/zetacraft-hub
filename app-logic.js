@@ -63,6 +63,11 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+// Serializza gli argomenti JavaScript e li protegge anche nel contesto HTML.
+function inlineJsArg(value) {
+  return escapeHtml(JSON.stringify(String(value == null ? '' : value)));
+}
+
 function formatUserText(value) {
   let out = escapeHtml(value);
   const pair = /&lt;(b|i|u)&gt;([\s\S]*?)&lt;\/\1&gt;/gi;
@@ -76,11 +81,19 @@ function formatUserText(value) {
 
 function safeHttpsUrl(value) {
   try {
-    const u = new URL(String(value).trim());
-    return u.protocol === 'https:' ? u.href : '';
+    const u = new URL(String(value || '').trim());
+    if (u.protocol !== 'https:' || !u.hostname || u.username || u.password) return '';
+    return u.href;
   } catch {
     return '';
   }
+}
+
+function safeProfileBanner(value) {
+  const raw = String(value || '').trim();
+  if (/^#[0-9a-f]{6}$/i.test(raw)) return { color: raw, image: '' };
+  const image = safeHttpsUrl(raw);
+  return image ? { color: 'transparent', image } : { color: '#0077ff', image: '' };
 }
 
 // ----------------------------------------------------------------------------
@@ -245,6 +258,23 @@ function getZetaMailAddress(usernameTag) {
     return `${clean}@zh.net`;
 }
 
+async function syncAccountEmail(uid, email, showEmail, consent) {
+    if (!db || !uid) throw new Error("Account non disponibile.");
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const privateData = {
+        email: normalizedEmail,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    if (consent && typeof consent === 'object') privateData.consent = consent;
+    await db.collection("private_users").doc(uid).set(privateData, { merge: true });
+    const publicRef = db.collection("public_contact_emails").doc(uid);
+    if (showEmail && normalizedEmail) {
+        await publicRef.set({ email: normalizedEmail, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    } else {
+        await publicRef.delete();
+    }
+}
+
 function listenZetaMailMessages() {
     const listElem = document.getElementById('zetamail-messages-list');
     if (!currentUserProfile || !db) {
@@ -329,31 +359,21 @@ async function sendZetaMailMessage() {
 // 8. DIAMANTI E GESTIONE PROFILO (CHIAVE UNIFICATA: zetacraft_diamonds)
 // ----------------------------------------------------------------------------
 async function addDiamondsToUser(amount = 1) {
-    let currentLocal = parseInt(localStorage.getItem('zetacraft_diamonds') || '0', 10);
-    currentLocal += amount;
-    localStorage.setItem('zetacraft_diamonds', currentLocal);
-
-    if (!currentUserProfile || !db) return currentLocal;
-
-    const userRef = db.collection("users").doc(currentUserProfile.uid);
-    try {
-        let nuovoTotale = 0;
-        await db.runTransaction(async (transaction) => {
-            const doc = await transaction.get(userRef);
-            let currentDbDiamonds = 0;
-            if (doc.exists && doc.data().diamonds !== undefined) {
-                currentDbDiamonds = doc.data().diamonds;
-            }
-            nuovoTotale = Math.max(currentDbDiamonds + amount, currentLocal);
-            transaction.update(userRef, { diamonds: nuovoTotale });
-        });
-
-        currentUserProfile.diamonds = nuovoTotale;
-        localStorage.setItem('zetacraft_diamonds', nuovoTotale);
-        return nuovoTotale;
-    } catch (e) {
-        return currentLocal;
+    // Il client non assegna valuta: il saldo è letto esclusivamente da Firestore.
+    // I premi saranno riattivati dopo l'integrazione dell'endpoint Worker autorizzato.
+    const requested = Number(amount);
+    if (!Number.isSafeInteger(requested) || requested <= 0) {
+        throw new Error("Quantità di diamanti non valida.");
     }
+    if (!auth || !auth.currentUser || !currentUserProfile || !db) {
+        throw new Error("Accedi con Firebase per visualizzare il saldo.");
+    }
+    const userRef = db.collection("users").doc(auth.currentUser.uid);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) throw new Error("Profilo utente non trovato.");
+    const balance = Number(userDoc.data().diamonds || 0);
+    currentUserProfile.diamonds = Number.isSafeInteger(balance) && balance >= 0 ? balance : 0;
+    return currentUserProfile.diamonds;
 }
 
 function updateUIWithProfile(profile) {
@@ -378,20 +398,12 @@ function updateUIWithProfile(profile) {
         if (usernameTagElem) usernameTagElem.innerText = profile.usernameTag;
         if (zhAddressElem) zhAddressElem.innerText = getZetaMailAddress(profile.usernameTag);
 
-        if (profileImgElem) profileImgElem.src = profile.imgprofile || "https://visage.surgeplay.com/face/64/Steve";
+        if (profileImgElem) profileImgElem.src = safeHttpsUrl(profile.imgprofile) || "https://visage.surgeplay.com/face/64/Steve";
 
         if (bannerPreview) {
-            if (profile.bannerUrl) {
-                if (profile.bannerUrl.startsWith('#')) {
-                    bannerPreview.style.backgroundImage = 'none';
-                    bannerPreview.style.backgroundColor = profile.bannerUrl;
-                } else {
-                    bannerPreview.style.backgroundImage = `url('${profile.bannerUrl}')`;
-                    bannerPreview.style.backgroundColor = 'transparent';
-                }
-            } else {
-                bannerPreview.style.backgroundImage = 'linear-gradient(135deg, #0077ff, #00d4ff)';
-            }
+            const banner = safeProfileBanner(profile.bannerUrl);
+            bannerPreview.style.backgroundImage = banner.image ? `url("${banner.image}")` : 'linear-gradient(135deg, #0077ff, #00d4ff)';
+            bannerPreview.style.backgroundColor = banner.color;
         }
 
         if (loggedBox) loggedBox.style.display = "flex";
@@ -435,8 +447,6 @@ function initAuthListener() {
                         imgprofile: user.photoURL || "https://visage.surgeplay.com/face/64/Steve",
                         bannerUrl: getRandomHexColor(),
                         bio: "",
-                        email: user.email || "",
-                        showEmail: false,
                         role: "user",
                         diamonds: 0,
                         consent: consentRecord()
@@ -450,11 +460,42 @@ function initAuthListener() {
                     imgprofile: user.photoURL || "https://visage.surgeplay.com/face/64/Steve",
                     bannerUrl: getRandomHexColor(),
                     bio: "",
-                    email: user.email || "",
-                    showEmail: false,
                     role: "user",
                     diamonds: 0
                 };
+            }
+            try {
+                const hasLegacyEmail = Object.prototype.hasOwnProperty.call(profileData, 'email')
+                    || Object.prototype.hasOwnProperty.call(profileData, 'showEmail');
+                const hasLegacyConsent = Object.prototype.hasOwnProperty.call(profileData, 'consent');
+                const legacyEmail = String(profileData.email || user.email || '').trim();
+                const legacyShow = !!profileData.showEmail;
+                const legacyConsent = profileData.consent || null;
+                await syncAccountEmail(
+                    user.uid,
+                    user.email || legacyEmail,
+                    hasLegacyEmail ? legacyShow : false,
+                    legacyConsent
+                );
+                const fieldsToDelete = {};
+                if (hasLegacyEmail) {
+                    fieldsToDelete.email = firebase.firestore.FieldValue.delete();
+                    fieldsToDelete.showEmail = firebase.firestore.FieldValue.delete();
+                }
+                if (hasLegacyConsent) fieldsToDelete.consent = firebase.firestore.FieldValue.delete();
+                if (Object.keys(fieldsToDelete).length) {
+                    await db.collection("users").doc(user.uid).update(fieldsToDelete);
+                }
+                if (hasLegacyEmail) {
+                    profileData.showEmail = legacyShow;
+                } else {
+                    const publicContact = await db.collection("public_contact_emails").doc(user.uid).get();
+                    profileData.showEmail = publicContact.exists;
+                }
+                profileData.consent = legacyConsent || null;
+                profileData.email = user.email || '';
+            } catch (privacyError) {
+                console.warn("Migrazione email privata non completata:", privacyError);
             }
             updateUIWithProfile(profileData);
         } else {
@@ -464,26 +505,9 @@ function initAuthListener() {
 }
 
 function checkExternalSessions() {
-    const savedDiscordUser = localStorage.getItem('discord_user');
-    if (savedDiscordUser) {
-        try {
-            const user = JSON.parse(savedDiscordUser);
-            updateUIWithProfile(user);
-            return true;
-        } catch(e) {
-            localStorage.removeItem('discord_user');
-        }
-    }
-    const savedCustomUser = localStorage.getItem('custom_oauth_user');
-    if (savedCustomUser) {
-        try {
-            const user = JSON.parse(savedCustomUser);
-            updateUIWithProfile(user);
-            return true;
-        } catch(e) {
-            localStorage.removeItem('custom_oauth_user');
-        }
-    }
+    // Le sessioni OAuth costruite dal frontend non sono autenticazioni affidabili.
+    localStorage.removeItem('discord_user');
+    localStorage.removeItem('custom_oauth_user');
     updateUIWithProfile(null);
     return false;
 }
@@ -569,14 +593,12 @@ async function handleAuthSubmit() {
                 imgprofile,
                 bannerUrl,
                 bio: "",
-                email,
-                showEmail: false,
                 role: "user",
                 diamonds: 0,
-                consent: consentRecord(),
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
+            await syncAccountEmail(user.uid, user.email || email, false, consentRecord());
             alert("Registrazione completata con successo!");
         } else {
             await auth.signInWithEmailAndPassword(email, password);
@@ -617,13 +639,11 @@ async function handleSocialLogin(provider, providerName) {
                 imgprofile: photoUrl,
                 bannerUrl: getRandomHexColor(),
                 bio: "",
-                email: user.email || "",
-                showEmail: false,
                 role: "user",
                 diamonds: 0,
-                consent: consentRecord(),
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
+            await syncAccountEmail(user.uid, user.email || "", false, consentRecord());
         }
     } catch (error) {
         alert(`Errore Accesso con ${providerName}: ${error.message}`);
@@ -631,17 +651,8 @@ async function handleSocialLogin(provider, providerName) {
 }
 
 async function handleLogout() {
-    if (localStorage.getItem('discord_user')) {
-        localStorage.removeItem('discord_user');
-        window.location.reload();
-        return;
-    }
-    if (localStorage.getItem('custom_oauth_user')) {
-        localStorage.removeItem('custom_oauth_user');
-        window.location.reload();
-        return;
-    }
     if (auth) await auth.signOut();
+    else updateUIWithProfile(null);
 }
 
 function openProfileSettingsModal() {
@@ -651,7 +662,7 @@ function openProfileSettingsModal() {
     document.getElementById('edit-img-profile').value = currentUserProfile.imgprofile || '';
     document.getElementById('edit-banner-url').value = currentUserProfile.bannerUrl || '';
     document.getElementById('edit-bio').value = currentUserProfile.bio || '';
-    document.getElementById('edit-email').value = currentUserProfile.email || '';
+    document.getElementById('edit-email').value = (auth && auth.currentUser && auth.currentUser.email) || currentUserProfile.email || '';
     document.getElementById('edit-show-email').checked = currentUserProfile.showEmail || false;
     document.getElementById('edit-password').value = '';
 
@@ -672,12 +683,24 @@ async function saveProfileSettings() {
     const imgprofile = document.getElementById('edit-img-profile').value.trim();
     let bannerUrl = document.getElementById('edit-banner-url').value.trim();
     const bio = document.getElementById('edit-bio').value.trim();
-    const email = document.getElementById('edit-email').value.trim();
+    const email = (auth.currentUser && auth.currentUser.email) || currentUserProfile.email || '';
     const showEmail = document.getElementById('edit-show-email').checked;
     const newPassword = document.getElementById('edit-password').value.trim();
 
     if (!displayName || !usernameTag) {
         alert("Il nome visualizzato e il nome utente sono obbligatori!");
+        return;
+    }
+    if (displayName.length > 40 || usernameTag.length > 32 || bio.length > 300) {
+        alert("Nome massimo 40 caratteri, username 32 e bio 300.");
+        return;
+    }
+    if (imgprofile && !safeHttpsUrl(imgprofile)) {
+        alert("L'immagine profilo deve essere un URL HTTPS valido.");
+        return;
+    }
+    if (bannerUrl && !/^#[0-9a-f]{6}$/i.test(bannerUrl) && !safeHttpsUrl(bannerUrl)) {
+        alert("La copertina deve essere un colore HEX (#RRGGBB) oppure un URL HTTPS valido.");
         return;
     }
 
@@ -713,21 +736,13 @@ async function saveProfileSettings() {
             imgprofile: imgprofile || currentUserProfile.imgprofile,
             bannerUrl,
             bio,
-            email: email || currentUserProfile.email,
-            showEmail,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
         await db.collection("users").doc(currentUserProfile.uid).update(updatedData);
+        await syncAccountEmail(currentUserProfile.uid, email, showEmail);
 
-        currentUserProfile = { ...currentUserProfile, ...updatedData };
-
-        if (localStorage.getItem('discord_user')) {
-            localStorage.setItem('discord_user', JSON.stringify(currentUserProfile));
-        }
-        if (localStorage.getItem('custom_oauth_user')) {
-            localStorage.setItem('custom_oauth_user', JSON.stringify(currentUserProfile));
-        }
+        currentUserProfile = { ...currentUserProfile, ...updatedData, email, showEmail };
 
         updateUIWithProfile(currentUserProfile);
         closeProfileSettingsModal();
@@ -754,37 +769,33 @@ async function openPublicProfile(userId) {
         document.getElementById('pub-profile-bio').innerText = data.bio || "Nessuna bio inserita.";
         document.getElementById('pub-profile-role').innerText = (data.role || "user").toUpperCase();
         const imgElem = document.getElementById('pub-profile-img');
-        if (imgElem) imgElem.src = data.imgprofile || "https://visage.surgeplay.com/face/64/Steve";
+        if (imgElem) imgElem.src = safeHttpsUrl(data.imgprofile) || "https://visage.surgeplay.com/face/64/Steve";
 
         const bannerElem = document.getElementById('pub-profile-banner');
-        const bannerUrl = data.bannerUrl || "";
+        const banner = safeProfileBanner(data.bannerUrl);
         if (bannerElem) {
-            if (bannerUrl.startsWith('#')) {
-                bannerElem.style.backgroundImage = 'none';
-                bannerElem.style.backgroundColor = bannerUrl;
-            } else if (bannerUrl) {
-                bannerElem.style.backgroundImage = `url('${bannerUrl}')`;
-                bannerElem.style.backgroundColor = 'transparent';
-            } else {
-                bannerElem.style.backgroundImage = 'linear-gradient(135deg, #0077ff, #00d4ff)';
-            }
+            bannerElem.style.backgroundImage = banner.image ? `url("${banner.image}")` : 'linear-gradient(135deg, #0077ff, #00d4ff)';
+            bannerElem.style.backgroundColor = banner.color;
         }
 
-        let diamonds = data.diamonds || 0;
-        if (currentUserProfile && currentUserProfile.uid === userId) {
-            const localDiamonds = parseInt(localStorage.getItem('zetacraft_diamonds') || '0', 10);
-            diamonds = Math.max(diamonds, localDiamonds);
-        }
+        const diamondsValue = Number(data.diamonds || 0);
+        const diamonds = Number.isSafeInteger(diamondsValue) && diamondsValue >= 0 ? diamondsValue : 0;
         const diamondsElem = document.getElementById('pub-profile-diamonds');
         if (diamondsElem) diamondsElem.innerText = diamonds;
 
         const emailContainer = document.getElementById('pub-profile-email-container');
         const emailElem = document.getElementById('pub-profile-email');
-        if (data.showEmail && data.email) {
-            if (emailElem) emailElem.innerText = data.email;
-            if (emailContainer) emailContainer.style.display = 'block';
-        } else {
-            if (emailContainer) emailContainer.style.display = 'none';
+        if (emailContainer) emailContainer.style.display = 'none';
+        if (emailElem) emailElem.innerText = '';
+        try {
+            const contactDoc = await db.collection("public_contact_emails").doc(userId).get();
+            const contactEmail = contactDoc.exists ? contactDoc.data().email : '';
+            if (contactEmail) {
+                if (emailElem) emailElem.innerText = contactEmail;
+                if (emailContainer) emailContainer.style.display = 'block';
+            }
+        } catch (contactError) {
+            console.warn("Email pubblica non disponibile:", contactError);
         }
 
         const blockBtn = document.getElementById('pub-profile-block-btn');
@@ -1015,6 +1026,7 @@ function parseEmbedLink(url) {
 
     if (cleanUrl.includes('youtube.com/watch') || cleanUrl.includes('youtu.be/')) {
         let videoId = cleanUrl.includes('youtu.be/') ? cleanUrl.split('youtu.be/')[1].split('?')[0] : new URLSearchParams(cleanUrl.split('?')[1]).get('v');
+        if (!/^[A-Za-z0-9_-]{11}$/.test(videoId || '')) return { type: 'link', url: cleanUrl };
         return { type: 'youtube', url: `https://www.youtube.com/embed/${videoId}` };
     }
     if (/\.(jpeg|jpg|gif|png|webp)($|\?)/i.test(cleanUrl)) {
@@ -1023,9 +1035,12 @@ function parseEmbedLink(url) {
     if (/\.(mp3|wav|ogg)($|\?)/i.test(cleanUrl)) {
         return { type: 'audio', url: cleanUrl };
     }
-    if (cleanUrl.includes('spotify.com/')) {
-        return { type: 'spotify', url: cleanUrl.replace('spotify.com/', 'spotify.com/embed/') };
-    }
+    try {
+        const parsed = new URL(cleanUrl);
+        if (parsed.protocol === 'https:' && (parsed.hostname === 'open.spotify.com' || parsed.hostname === 'spotify.com')) {
+            return { type: 'spotify', url: `https://open.spotify.com/embed${parsed.pathname}` };
+        }
+    } catch {}
 
     return { type: 'link', url: cleanUrl };
 }
@@ -1267,13 +1282,13 @@ function renderCommunityPosts(postsList) {
         let mediaHtml = "";
 
         if (post.mediaType === 'youtube') {
-            mediaHtml = `<div style="margin-top:8px; border-radius:12px; overflow:hidden; aspect-ratio:16/9;"><iframe src="${safeHttpsUrl(post.mediaUrl)}" style="width:100%; height:100%; border:none;"></iframe></div>`;
+            mediaHtml = `<div style="margin-top:8px; border-radius:12px; overflow:hidden; aspect-ratio:16/9;"><iframe src="${safeHttpsUrl(post.mediaUrl)}" sandbox="allow-scripts allow-same-origin allow-presentation" referrerpolicy="strict-origin-when-cross-origin" style="width:100%; height:100%; border:none;" title="Video YouTube" loading="lazy"></iframe></div>`;
         } else if (post.mediaType === 'image') {
             mediaHtml = `<img src="${safeHttpsUrl(post.mediaUrl)}" style="width:100%; max-height:240px; object-fit:cover; border-radius:12px; margin-top:8px;" />`;
         } else if (post.mediaType === 'audio') {
             mediaHtml = `<audio controls style="width:100%; margin-top:8px;"><source src="${safeHttpsUrl(post.mediaUrl)}"></audio>`;
         } else if (post.mediaType === 'spotify') {
-            mediaHtml = `<iframe src="${safeHttpsUrl(post.mediaUrl)}" width="100%" height="80" frameborder="0" style="border-radius:12px; margin-top:8px;"></iframe>`;
+            mediaHtml = `<iframe src="${safeHttpsUrl(post.mediaUrl)}" sandbox="allow-scripts allow-same-origin allow-presentation" referrerpolicy="strict-origin-when-cross-origin" width="100%" height="80" frameborder="0" style="border-radius:12px; margin-top:8px;" title="Player Spotify" loading="lazy"></iframe>`;
         } else if (post.mediaType === 'link' && post.mediaUrl) {
             const linkRes = checkLink(post.mediaUrl);
             mediaHtml = `
@@ -1295,13 +1310,13 @@ function renderCommunityPosts(postsList) {
             : 'background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.08);';
 
         const staffBadge = isStaffPost 
-            ? `<span style="background: linear-gradient(135deg, #00d4ff, #0077ff); color: #fff; font-size: 8px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-left: 6px;">🛡️ ${(post.role || 'STAFF').toUpperCase()}</span>` 
+            ? `<span style="background: linear-gradient(135deg, #00d4ff, #0077ff); color: #fff; font-size: 8px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-left: 6px;">🛡️ ${escapeHtml((post.role || 'STAFF').toUpperCase())}</span>` 
             : '';
 
         return `
             <div class="setting-row" style="flex-direction:column; align-items:stretch; text-align:left; ${cardStyle} position:relative; border-radius: 12px; padding: 12px; margin-bottom: 8px;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <div style="display:flex; align-items:center; gap:8px; cursor:pointer;" onclick="openPublicProfile('${post.authorId}')">
+                    <div style="display:flex; align-items:center; gap:8px; cursor:pointer;" onclick="openPublicProfile(${inlineJsArg(post.authorId)})">
                         <img src="${avatarSrc}" style="width:28px; height:28px; border-radius:50%; object-fit:cover; border: 1px solid ${isStaffPost ? '#00d4ff' : 'rgba(255, 255, 255, 0.2)'};" />
                         <div style="display:flex; align-items:center;">
                             <strong style="font-size:11px; color:${isStaffPost ? '#00d4ff' : '#fff'};">${escapeHtml(post.authorName)}</strong>
@@ -1309,8 +1324,8 @@ function renderCommunityPosts(postsList) {
                         </div>
                     </div>
                     <div style="display:flex; gap:6px; align-items:center;">
-                        <button onclick="reportPost('${post.id}')" style="background:none; border:none; font-size:11px; cursor:pointer;" title="Segnala Post">🚩</button>
-                        ${canDelete ? `<button onclick="deletePost('${post.id}')" style="background:none; border:none; color:#ff4757; font-size:12px; cursor:pointer;" title="Elimina Post">🗑️</button>` : ''}
+                        <button onclick="reportPost(${inlineJsArg(post.id)})" style="background:none; border:none; font-size:11px; cursor:pointer;" title="Segnala Post">🚩</button>
+                        ${canDelete ? `<button onclick="deletePost(${inlineJsArg(post.id)})" style="background:none; border:none; color:#ff4757; font-size:12px; cursor:pointer;" title="Elimina Post">🗑️</button>` : ''}
                     </div>
                 </div>
 
@@ -1320,23 +1335,23 @@ function renderCommunityPosts(postsList) {
                 ${mediaHtml}
 
                 <div style="display:flex; align-items:center; gap:12px; margin-top:10px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);">
-                    <button onclick="toggleLikePost('${post.id}')" style="background:none; border:none; color:${isLiked ? '#00d4ff' : '#aaa'}; font-size:11px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                    <button onclick="toggleLikePost(${inlineJsArg(post.id)})" style="background:none; border:none; color:${isLiked ? '#00d4ff' : '#aaa'}; font-size:11px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:4px;">
                         ${isLiked ? '❤️' : '🤍'} <span>${likeCount}</span>
                     </button>
-                    <button onclick="toggleCommentsView('${post.id}')" style="background:none; border:none; color:#aaa; font-size:11px; cursor:pointer;">
+                    <button onclick="toggleCommentsView(${inlineJsArg(post.id)})" style="background:none; border:none; color:#aaa; font-size:11px; cursor:pointer;">
                         💬 Commenti
                     </button>
                 </div>
 
-                <div id="comments-box-${post.id}" style="display:none; margin-top:10px; flex-direction:column; gap:8px;">
-                    <div id="comments-list-${post.id}" style="display:flex; flex-direction:column; gap:6px; max-height:150px; overflow-y:auto;">
+                <div id="comments-box-${escapeHtml(post.id)}" style="display:none; margin-top:10px; flex-direction:column; gap:8px;">
+                    <div id="comments-list-${escapeHtml(post.id)}" style="display:flex; flex-direction:column; gap:6px; max-height:150px; overflow-y:auto;">
                         <span style="font-size:10px; color:#888;">Caricamento commenti...</span>
                     </div>
 
                     ${currentUid ? `
                         <div style="display:flex; gap:6px; margin-top:4px;">
-                            <input type="text" id="comment-input-${post.id}" class="app-input" placeholder="Scrivi un commento..." style="font-size:10px; padding:6px 10px;" />
-                            <button onclick="submitComment('${post.id}')" class="liquid-btn" style="padding:6px 10px; font-size:10px;">INVIA</button>
+                            <input type="text" id="comment-input-${escapeHtml(post.id)}" class="app-input" placeholder="Scrivi un commento..." style="font-size:10px; padding:6px 10px;" />
+                            <button onclick="submitComment(${inlineJsArg(post.id)})" class="liquid-btn" style="padding:6px 10px; font-size:10px;">INVIA</button>
                         </div>
                     ` : '<span style="font-size:9px; color:#aaa;">Accedi per commentare.</span>'}
                 </div>
@@ -1413,9 +1428,9 @@ function listenToComments(postId) {
                         <strong style="color:#00d4ff;">${escapeHtml(c.authorName)}</strong>:
                         <span style="color:#eee;">${formatUserText(c.text)}</span>
                         <div style="display:flex;gap:10px;margin-top:5px;">
-                            <button onclick="replyToComment('${postId}','${doc.id}')" style="background:none;border:0;color:#00d4ff;font-size:9px;">↩ Rispondi</button>
-                            <button onclick="reportComment('${postId}','${doc.id}')" style="background:none;border:0;color:#aaa;font-size:9px;">🚩 Segnala</button>
-                            ${(mine || isCurrentUserStaff()) ? `<button onclick="deleteComment('${postId}','${doc.id}','${c.authorId || ''}')" style="background:none;border:0;color:#ff4757;font-size:9px;">🗑 Elimina</button>` : ''}
+                            <button onclick="replyToComment(${inlineJsArg(postId)},${inlineJsArg(doc.id)})" style="background:none;border:0;color:#00d4ff;font-size:9px;">↩ Rispondi</button>
+                            <button onclick="reportComment(${inlineJsArg(postId)},${inlineJsArg(doc.id)})" style="background:none;border:0;color:#aaa;font-size:9px;">🚩 Segnala</button>
+                            ${(mine || isCurrentUserStaff()) ? `<button onclick="deleteComment(${inlineJsArg(postId)},${inlineJsArg(doc.id)},${inlineJsArg(c.authorId || '')})" style="background:none;border:0;color:#ff4757;font-size:9px;">🗑 Elimina</button>` : ''}
                         </div>
                     </div>`;
             }).join('');
@@ -1459,165 +1474,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const REDIRECT_URI = new URL(APP_SHARE_URL).origin + "/";
 
     if (accessToken) {
+        // I vecchi flussi OAuth implicit restituiscono token al browser e non creano
+        // una sessione Firebase Auth. Scartiamo il token: mai usarlo come identità locale.
         window.history.replaceState({}, document.title, window.location.pathname);
-
-        if (window.location.search.includes('twitch') || localStorage.getItem('auth_provider') === 'twitch') {
-            localStorage.removeItem('auth_provider');
-            fetch('https://api.twitch.tv/helix/users', {
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Client-Id': 'kcgj8rq3rvreo55w78009zq6pydi5x'
-                }
-            })
-            .then(res => res.json())
-            .then(async (data) => {
-                if (data.data && data.data.length > 0) {
-                    const userData = data.data[0];
-                    const twitchProfile = {
-                        uid: "twitch_" + userData.id,
-                        displayName: userData.display_name,
-                        usernameTag: "@" + userData.login.toLowerCase(),
-                        imgprofile: userData.profile_image_url || 'https://visage.surgeplay.com/face/64/Steve',
-                        bannerUrl: getRandomHexColor(),
-                        bio: userData.description || "",
-                        email: userData.email || "",
-                        showEmail: false,
-                        provider: 'twitch',
-                        role: 'user',
-                        diamonds: 0,
-                        consent: consentRecord()
-                    };
-                    if (db) {
-                        try {
-                            await db.collection("users").doc(twitchProfile.uid).set({
-                                ...twitchProfile,
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            }, { merge: true });
-                        } catch (err) {}
-                    }
-                    localStorage.setItem('custom_oauth_user', JSON.stringify(twitchProfile));
-                    updateUIWithProfile(twitchProfile);
-                }
-            }).catch(err => {});
-        } 
-        else if (localStorage.getItem('auth_provider') === 'gitlab') {
-            localStorage.removeItem('auth_provider');
-            fetch('https://gitlab.com/api/v4/user', {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            })
-            .then(res => res.json())
-            .then(async (userData) => {
-                if (userData.id) {
-                    const gitlabProfile = {
-                        uid: "gitlab_" + userData.id,
-                        displayName: userData.name || userData.username,
-                        usernameTag: "@" + userData.username.toLowerCase(),
-                        imgprofile: userData.avatar_url || 'https://visage.surgeplay.com/face/64/Steve',
-                        bannerUrl: getRandomHexColor(),
-                        bio: userData.bio || "",
-                        email: userData.email || "",
-                        showEmail: false,
-                        provider: 'gitlab',
-                        role: 'user',
-                        diamonds: 0,
-                        consent: consentRecord()
-                    };
-                    if (db) {
-                        try {
-                            await db.collection("users").doc(gitlabProfile.uid).set({
-                                ...gitlabProfile,
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            }, { merge: true });
-                        } catch (err) {}
-                    }
-                    localStorage.setItem('custom_oauth_user', JSON.stringify(gitlabProfile));
-                    updateUIWithProfile(gitlabProfile);
-                }
-            }).catch(err => {});
-        }
-        else if (localStorage.getItem('auth_provider') === 'figma') {
-            localStorage.removeItem('auth_provider');
-            fetch('https://api.figma.com/v1/me', {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            })
-            .then(res => res.json())
-            .then(async (userData) => {
-                if (userData.id) {
-
-                    const figmaProfile = {
-                        uid: "figma_" + userData.id,
-                        displayName: userData.handle || "Utente Figma",
-                        usernameTag: "@" + (userData.handle || "figma").toLowerCase().replace(/\s+/g, ''),
-                        imgprofile: userData.img_url || "https://visage.surgeplay.com/face/64/Steve",
-                        bannerUrl: getRandomHexColor(),
-                        bio: "",
-                        email: userData.email || "",
-                        showEmail: false,
-                        provider: 'figma',
-                        role: 'user',
-                        diamonds: 0,
-                        consent: consentRecord()
-                    };
-                    if (db) {
-                        try {
-                            await db.collection("users").doc(figmaProfile.uid).set({
-                                ...figmaProfile,
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            }, { merge: true });
-                        } catch (err) {}
-                    }
-                    localStorage.setItem('custom_oauth_user', JSON.stringify(figmaProfile));
-                    updateUIWithProfile(figmaProfile);
-                }
-            }).catch(err => {});
-        }
-        else {
-            fetch('https://discord.com/api/users/@me', {
-                headers: { authorization: `Bearer ${accessToken}` },
-            })
-            .then(res => res.json())
-            .then(async (userData) => {
-                if (userData.id) {
-                    const displayName = userData.global_name || userData.username;
-                    const usernameTag = "@" + userData.username;
-                    const avatarUrl = userData.avatar 
-                        ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
-                        : 'https://cdn.discordapp.com/embed/avatars/0.png';
-
-                    const discordProfile = {
-                        uid: "discord_" + userData.id,
-                        displayName: displayName,
-                        usernameTag: usernameTag,
-                        imgprofile: avatarUrl,
-                        bannerUrl: getRandomHexColor(),
-                        bio: "",
-                        email: userData.email || "",
-                        showEmail: false,
-                        provider: 'discord',
-                        role: 'user',
-                        diamonds: 0,
-                        consent: consentRecord()
-                    };
-
-                    if (db) {
-                        try {
-                            const userDocRef = db.collection("users").doc(discordProfile.uid);
-                            await userDocRef.set({
-                                ...discordProfile,
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            }, { merge: true });
-                        } catch (err) {}
-                    }
-
-                    localStorage.setItem('discord_user', JSON.stringify(discordProfile));
-                    updateUIWithProfile(discordProfile);
-                }
-            })
-            .catch(err => {});
-        }
-    } else {
-        initAuthListener();
+        localStorage.removeItem('auth_provider');
+        alert("Questo accesso social è in fase di migrazione alla verifica server-side e Firebase Auth. Per ora usa l'accesso Firebase.");
     }
+    initAuthListener();
 
     const toggleAuthBtn = document.getElementById('toggle-auth-mode-btn');
     if (toggleAuthBtn) toggleAuthBtn.addEventListener('click', toggleAuthMode);
@@ -1671,57 +1534,21 @@ document.addEventListener('DOMContentLoaded', () => {
         handleSocialLogin(yahooProvider, "Yahoo");
     });
 
-    const DISCORD_CLIENT_ID = "1542912801004068866";
-    const discordBtn = document.getElementById('login-discord-btn');
-    if (discordBtn) {
-        discordBtn.addEventListener('click', () => {
-            if (!consentGiven()) {
-                alert("⚠️ Devi accettare i Termini e la Privacy Policy per continuare!");
-                return;
-            }
-            const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=identify%20email`;
-            window.location.href = discordAuthUrl;
-        });
-    }
-
-    const twitchBtn = document.getElementById('login-twitch-btn');
-    if (twitchBtn) {
-        twitchBtn.addEventListener('click', () => {
-            if (!consentGiven()) {
-                alert("⚠️ Devi accettare i Termini e la Privacy Policy per continuare!");
-                return;
-            }
-            localStorage.setItem('auth_provider', 'twitch');
-            const twitchAuthUrl = `https://id.twitch.tv/oauth2/authorize?client_id=kcgj8rq3rvreo55w78009zq6pydi5x&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=user:read:email`;
-            window.location.href = twitchAuthUrl;
-        });
-    }
-
-    const gitlabBtn = document.getElementById('login-gitlab-btn');
-    if (gitlabBtn) {
-        gitlabBtn.addEventListener('click', () => {
-            if (!consentGiven()) {
-                alert("⚠️ Devi accettare i Termini e la Privacy Policy per continuare!");
-                return;
-            }
-            localStorage.setItem('auth_provider', 'gitlab');
-            const gitlabAuthUrl = `https://gitlab.com/oauth/authorize?client_id=09e863ef269de1c5326aecc47a0142695556ddb09a2791ea49011fe9c19d0592&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=read_user`;
-            window.location.href = gitlabAuthUrl;
-        });
-    }
-
-    const figmaBtn = document.getElementById('login-figma-btn');
-    if (figmaBtn) {
-        figmaBtn.addEventListener('click', () => {
-            if (!consentGiven()) {
-                alert("⚠️ Devi accettare i Termini e la Privacy Policy per continuare!");
-                return;
-            }
-            localStorage.setItem('auth_provider', 'figma');
-            const figmaAuthUrl = `https://www.figma.com/oauth?client_id=4ygmaKf3sRfz7DWWW2HOXz&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=current_user:read&response_type=token`;
-            window.location.href = figmaAuthUrl;
-        });
-    }
+    // OAuth browser-only implicit flow disabilitati: i token non devono essere
+    // consegnati al frontend. Riattivare i provider solo dopo il broker Worker
+    // (Authorization Code + PKCE), verifica server-side e Firebase Custom Token.
+    ['discord', 'twitch', 'gitlab', 'figma'].forEach(providerName => {
+        const button = document.getElementById(`login-${providerName}-btn`);
+        if (button) {
+            button.addEventListener('click', () => {
+                if (!consentGiven()) {
+                    alert("⚠️ Devi accettare i Termini e la Privacy Policy per continuare!");
+                    return;
+                }
+                alert("Accesso " + providerName + " temporaneamente sospeso: stiamo migrando a un'autenticazione sicura tramite Firebase.");
+            });
+        }
+    });
 
     const userLogoutBtn = document.getElementById('logout-btn');
     if (userLogoutBtn) userLogoutBtn.addEventListener('click', handleLogout);
