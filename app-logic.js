@@ -463,17 +463,26 @@ function initAuthListener() {
                 };
             }
             try {
-                const legacyEmail = String(profileData.email || user.email || '').trim();
-                const legacyShow = !!profileData.showEmail;
-                await syncAccountEmail(user.uid, user.email || legacyEmail, legacyShow);
-                if (Object.prototype.hasOwnProperty.call(profileData, 'email') || Object.prototype.hasOwnProperty.call(profileData, 'showEmail')) {
+                const hasLegacyEmail = Object.prototype.hasOwnProperty.call(profileData, 'email')
+                    || Object.prototype.hasOwnProperty.call(profileData, 'showEmail');
+                if (hasLegacyEmail) {
+                    const legacyEmail = String(profileData.email || user.email || '').trim();
+                    const legacyShow = !!profileData.showEmail;
+                    await syncAccountEmail(user.uid, user.email || legacyEmail, legacyShow);
                     await db.collection("users").doc(user.uid).update({
                         email: firebase.firestore.FieldValue.delete(),
                         showEmail: firebase.firestore.FieldValue.delete()
                     });
+                    profileData.showEmail = legacyShow;
+                } else {
+                    await db.collection("private_users").doc(user.uid).set({
+                        email: String(user.email || '').trim().toLowerCase(),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+                    const publicContact = await db.collection("public_contact_emails").doc(user.uid).get();
+                    profileData.showEmail = publicContact.exists;
                 }
                 profileData.email = user.email || '';
-                profileData.showEmail = legacyShow;
             } catch (privacyError) {
                 console.warn("Migrazione email privata non completata:", privacyError);
             }
