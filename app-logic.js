@@ -258,6 +258,21 @@ function getZetaMailAddress(usernameTag) {
     return `${clean}@zh.net`;
 }
 
+async function syncAccountEmail(uid, email, showEmail) {
+    if (!db || !uid) throw new Error("Account non disponibile.");
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    await db.collection("private_users").doc(uid).set({
+        email: normalizedEmail,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    const publicRef = db.collection("public_contact_emails").doc(uid);
+    if (showEmail && normalizedEmail) {
+        await publicRef.set({ email: normalizedEmail, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    } else {
+        await publicRef.delete();
+    }
+}
+
 function listenZetaMailMessages() {
     const listElem = document.getElementById('zetamail-messages-list');
     if (!currentUserProfile || !db) {
@@ -430,8 +445,6 @@ function initAuthListener() {
                         imgprofile: user.photoURL || "https://visage.surgeplay.com/face/64/Steve",
                         bannerUrl: getRandomHexColor(),
                         bio: "",
-                        email: user.email || "",
-                        showEmail: false,
                         role: "user",
                         diamonds: 0,
                         consent: consentRecord()
@@ -445,11 +458,24 @@ function initAuthListener() {
                     imgprofile: user.photoURL || "https://visage.surgeplay.com/face/64/Steve",
                     bannerUrl: getRandomHexColor(),
                     bio: "",
-                    email: user.email || "",
-                    showEmail: false,
                     role: "user",
                     diamonds: 0
                 };
+            }
+            try {
+                const legacyEmail = String(profileData.email || user.email || '').trim();
+                const legacyShow = !!profileData.showEmail;
+                await syncAccountEmail(user.uid, user.email || legacyEmail, legacyShow);
+                if (Object.prototype.hasOwnProperty.call(profileData, 'email') || Object.prototype.hasOwnProperty.call(profileData, 'showEmail')) {
+                    await db.collection("users").doc(user.uid).update({
+                        email: firebase.firestore.FieldValue.delete(),
+                        showEmail: firebase.firestore.FieldValue.delete()
+                    });
+                }
+                profileData.email = user.email || '';
+                profileData.showEmail = legacyShow;
+            } catch (privacyError) {
+                console.warn("Migrazione email privata non completata:", privacyError);
             }
             updateUIWithProfile(profileData);
         } else {
@@ -547,14 +573,13 @@ async function handleAuthSubmit() {
                 imgprofile,
                 bannerUrl,
                 bio: "",
-                email,
-                showEmail: false,
                 role: "user",
                 diamonds: 0,
                 consent: consentRecord(),
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
+            await syncAccountEmail(user.uid, user.email || email, false);
             alert("Registrazione completata con successo!");
         } else {
             await auth.signInWithEmailAndPassword(email, password);
@@ -595,13 +620,12 @@ async function handleSocialLogin(provider, providerName) {
                 imgprofile: photoUrl,
                 bannerUrl: getRandomHexColor(),
                 bio: "",
-                email: user.email || "",
-                showEmail: false,
                 role: "user",
                 diamonds: 0,
                 consent: consentRecord(),
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
+            await syncAccountEmail(user.uid, user.email || "", false);
         }
     } catch (error) {
         alert(`Errore Accesso con ${providerName}: ${error.message}`);
@@ -620,7 +644,7 @@ function openProfileSettingsModal() {
     document.getElementById('edit-img-profile').value = currentUserProfile.imgprofile || '';
     document.getElementById('edit-banner-url').value = currentUserProfile.bannerUrl || '';
     document.getElementById('edit-bio').value = currentUserProfile.bio || '';
-    document.getElementById('edit-email').value = currentUserProfile.email || '';
+    document.getElementById('edit-email').value = (auth && auth.currentUser && auth.currentUser.email) || currentUserProfile.email || '';
     document.getElementById('edit-show-email').checked = currentUserProfile.showEmail || false;
     document.getElementById('edit-password').value = '';
 
@@ -641,7 +665,7 @@ async function saveProfileSettings() {
     const imgprofile = document.getElementById('edit-img-profile').value.trim();
     let bannerUrl = document.getElementById('edit-banner-url').value.trim();
     const bio = document.getElementById('edit-bio').value.trim();
-    const email = document.getElementById('edit-email').value.trim();
+    const email = (auth.currentUser && auth.currentUser.email) || currentUserProfile.email || '';
     const showEmail = document.getElementById('edit-show-email').checked;
     const newPassword = document.getElementById('edit-password').value.trim();
 
@@ -694,14 +718,13 @@ async function saveProfileSettings() {
             imgprofile: imgprofile || currentUserProfile.imgprofile,
             bannerUrl,
             bio,
-            email: email || currentUserProfile.email,
-            showEmail,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
         await db.collection("users").doc(currentUserProfile.uid).update(updatedData);
+        await syncAccountEmail(currentUserProfile.uid, email, showEmail);
 
-        currentUserProfile = { ...currentUserProfile, ...updatedData };
+        currentUserProfile = { ...currentUserProfile, ...updatedData, email, showEmail };
 
         updateUIWithProfile(currentUserProfile);
         closeProfileSettingsModal();
@@ -744,11 +767,17 @@ async function openPublicProfile(userId) {
 
         const emailContainer = document.getElementById('pub-profile-email-container');
         const emailElem = document.getElementById('pub-profile-email');
-        if (data.showEmail && data.email) {
-            if (emailElem) emailElem.innerText = data.email;
-            if (emailContainer) emailContainer.style.display = 'block';
-        } else {
-            if (emailContainer) emailContainer.style.display = 'none';
+        if (emailContainer) emailContainer.style.display = 'none';
+        if (emailElem) emailElem.innerText = '';
+        try {
+            const contactDoc = await db.collection("public_contact_emails").doc(userId).get();
+            const contactEmail = contactDoc.exists ? contactDoc.data().email : '';
+            if (contactEmail) {
+                if (emailElem) emailElem.innerText = contactEmail;
+                if (emailContainer) emailContainer.style.display = 'block';
+            }
+        } catch (contactError) {
+            console.warn("Email pubblica non disponibile:", contactError);
         }
 
         const blockBtn = document.getElementById('pub-profile-block-btn');
