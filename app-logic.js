@@ -63,6 +63,11 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+// Serializza gli argomenti JavaScript e li protegge anche nel contesto HTML.
+function inlineJsArg(value) {
+  return escapeHtml(JSON.stringify(String(value == null ? '' : value)));
+}
+
 function formatUserText(value) {
   let out = escapeHtml(value);
   const pair = /&lt;(b|i|u)&gt;([\s\S]*?)&lt;\/\1&gt;/gi;
@@ -1264,7 +1269,7 @@ function renderCommunityPosts(postsList) {
         return `
             <div class="setting-row" style="flex-direction:column; align-items:stretch; text-align:left; ${cardStyle} position:relative; border-radius: 12px; padding: 12px; margin-bottom: 8px;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <div style="display:flex; align-items:center; gap:8px; cursor:pointer;" onclick="openPublicProfile('${post.authorId}')">
+                    <div style="display:flex; align-items:center; gap:8px; cursor:pointer;" onclick="openPublicProfile(${inlineJsArg(post.authorId)})">
                         <img src="${avatarSrc}" style="width:28px; height:28px; border-radius:50%; object-fit:cover; border: 1px solid ${isStaffPost ? '#00d4ff' : 'rgba(255, 255, 255, 0.2)'};" />
                         <div style="display:flex; align-items:center;">
                             <strong style="font-size:11px; color:${isStaffPost ? '#00d4ff' : '#fff'};">${escapeHtml(post.authorName)}</strong>
@@ -1272,8 +1277,8 @@ function renderCommunityPosts(postsList) {
                         </div>
                     </div>
                     <div style="display:flex; gap:6px; align-items:center;">
-                        <button onclick="reportPost('${post.id}')" style="background:none; border:none; font-size:11px; cursor:pointer;" title="Segnala Post">🚩</button>
-                        ${canDelete ? `<button onclick="deletePost('${post.id}')" style="background:none; border:none; color:#ff4757; font-size:12px; cursor:pointer;" title="Elimina Post">🗑️</button>` : ''}
+                        <button onclick="reportPost(${inlineJsArg(post.id)})" style="background:none; border:none; font-size:11px; cursor:pointer;" title="Segnala Post">🚩</button>
+                        ${canDelete ? `<button onclick="deletePost(${inlineJsArg(post.id)})" style="background:none; border:none; color:#ff4757; font-size:12px; cursor:pointer;" title="Elimina Post">🗑️</button>` : ''}
                     </div>
                 </div>
 
@@ -1283,10 +1288,10 @@ function renderCommunityPosts(postsList) {
                 ${mediaHtml}
 
                 <div style="display:flex; align-items:center; gap:12px; margin-top:10px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);">
-                    <button onclick="toggleLikePost('${post.id}')" style="background:none; border:none; color:${isLiked ? '#00d4ff' : '#aaa'}; font-size:11px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                    <button onclick="toggleLikePost(${inlineJsArg(post.id)})" style="background:none; border:none; color:${isLiked ? '#00d4ff' : '#aaa'}; font-size:11px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:4px;">
                         ${isLiked ? '❤️' : '🤍'} <span>${likeCount}</span>
                     </button>
-                    <button onclick="toggleCommentsView('${post.id}')" style="background:none; border:none; color:#aaa; font-size:11px; cursor:pointer;">
+                    <button onclick="toggleCommentsView(${inlineJsArg(post.id)})" style="background:none; border:none; color:#aaa; font-size:11px; cursor:pointer;">
                         💬 Commenti
                     </button>
                 </div>
@@ -1299,7 +1304,7 @@ function renderCommunityPosts(postsList) {
                     ${currentUid ? `
                         <div style="display:flex; gap:6px; margin-top:4px;">
                             <input type="text" id="comment-input-${post.id}" class="app-input" placeholder="Scrivi un commento..." style="font-size:10px; padding:6px 10px;" />
-                            <button onclick="submitComment('${post.id}')" class="liquid-btn" style="padding:6px 10px; font-size:10px;">INVIA</button>
+                            <button onclick="submitComment(${inlineJsArg(post.id)})" class="liquid-btn" style="padding:6px 10px; font-size:10px;">INVIA</button>
                         </div>
                     ` : '<span style="font-size:9px; color:#aaa;">Accedi per commentare.</span>'}
                 </div>
@@ -1376,9 +1381,9 @@ function listenToComments(postId) {
                         <strong style="color:#00d4ff;">${escapeHtml(c.authorName)}</strong>:
                         <span style="color:#eee;">${formatUserText(c.text)}</span>
                         <div style="display:flex;gap:10px;margin-top:5px;">
-                            <button onclick="replyToComment('${postId}','${doc.id}')" style="background:none;border:0;color:#00d4ff;font-size:9px;">↩ Rispondi</button>
-                            <button onclick="reportComment('${postId}','${doc.id}')" style="background:none;border:0;color:#aaa;font-size:9px;">🚩 Segnala</button>
-                            ${(mine || isCurrentUserStaff()) ? `<button onclick="deleteComment('${postId}','${doc.id}','${c.authorId || ''}')" style="background:none;border:0;color:#ff4757;font-size:9px;">🗑 Elimina</button>` : ''}
+                            <button onclick="replyToComment(${inlineJsArg(postId)},${inlineJsArg(doc.id)})" style="background:none;border:0;color:#00d4ff;font-size:9px;">↩ Rispondi</button>
+                            <button onclick="reportComment(${inlineJsArg(postId)},${inlineJsArg(doc.id)})" style="background:none;border:0;color:#aaa;font-size:9px;">🚩 Segnala</button>
+                            ${(mine || isCurrentUserStaff()) ? `<button onclick="deleteComment(${inlineJsArg(postId)},${inlineJsArg(doc.id)},${inlineJsArg(c.authorId || '')})" style="background:none;border:0;color:#ff4757;font-size:9px;">🗑 Elimina</button>` : ''}
                         </div>
                     </div>`;
             }).join('');
