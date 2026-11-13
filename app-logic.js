@@ -1487,57 +1487,21 @@ document.addEventListener('DOMContentLoaded', () => {
         handleSocialLogin(yahooProvider, "Yahoo");
     });
 
-    const DISCORD_CLIENT_ID = "1542912801004068866";
-    const discordBtn = document.getElementById('login-discord-btn');
-    if (discordBtn) {
-        discordBtn.addEventListener('click', () => {
-            if (!consentGiven()) {
-                alert("⚠️ Devi accettare i Termini e la Privacy Policy per continuare!");
-                return;
-            }
-            const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=identify%20email`;
-            window.location.href = discordAuthUrl;
-        });
-    }
-
-    const twitchBtn = document.getElementById('login-twitch-btn');
-    if (twitchBtn) {
-        twitchBtn.addEventListener('click', () => {
-            if (!consentGiven()) {
-                alert("⚠️ Devi accettare i Termini e la Privacy Policy per continuare!");
-                return;
-            }
-            localStorage.setItem('auth_provider', 'twitch');
-            const twitchAuthUrl = `https://id.twitch.tv/oauth2/authorize?client_id=kcgj8rq3rvreo55w78009zq6pydi5x&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=user:read:email`;
-            window.location.href = twitchAuthUrl;
-        });
-    }
-
-    const gitlabBtn = document.getElementById('login-gitlab-btn');
-    if (gitlabBtn) {
-        gitlabBtn.addEventListener('click', () => {
-            if (!consentGiven()) {
-                alert("⚠️ Devi accettare i Termini e la Privacy Policy per continuare!");
-                return;
-            }
-            localStorage.setItem('auth_provider', 'gitlab');
-            const gitlabAuthUrl = `https://gitlab.com/oauth/authorize?client_id=09e863ef269de1c5326aecc47a0142695556ddb09a2791ea49011fe9c19d0592&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=read_user`;
-            window.location.href = gitlabAuthUrl;
-        });
-    }
-
-    const figmaBtn = document.getElementById('login-figma-btn');
-    if (figmaBtn) {
-        figmaBtn.addEventListener('click', () => {
-            if (!consentGiven()) {
-                alert("⚠️ Devi accettare i Termini e la Privacy Policy per continuare!");
-                return;
-            }
-            localStorage.setItem('auth_provider', 'figma');
-            const figmaAuthUrl = `https://www.figma.com/oauth?client_id=4ygmaKf3sRfz7DWWW2HOXz&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=current_user:read&response_type=token`;
-            window.location.href = figmaAuthUrl;
-        });
-    }
+    // OAuth browser-only implicit flow disabilitati: i token non devono essere
+    // consegnati al frontend. Riattivare i provider solo dopo il broker Worker
+    // (Authorization Code + PKCE), verifica server-side e Firebase Custom Token.
+    ['discord', 'twitch', 'gitlab', 'figma'].forEach(providerName => {
+        const button = document.getElementById(`login-${providerName}-btn`);
+        if (button) {
+            button.addEventListener('click', () => {
+                if (!consentGiven()) {
+                    alert("⚠️ Devi accettare i Termini e la Privacy Policy per continuare!");
+                    return;
+                }
+                alert("Accesso " + providerName + " temporaneamente sospeso: stiamo migrando a un'autenticazione sicura tramite Firebase.");
+            });
+        }
+    });
 
     const userLogoutBtn = document.getElementById('logout-btn');
     if (userLogoutBtn) userLogoutBtn.addEventListener('click', handleLogout);
