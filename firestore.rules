@@ -58,22 +58,22 @@ service cloud.firestore {
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.get('role', 'user') == (staff() ? request.auth.token.role : 'user')
         && request.resource.data.get('authorName', '') is string
-        && request.resource.data.authorName.size() > 0
-        && request.resource.data.authorName.size() <= 80
+        && request.resource.data.get('authorName', '').size() > 0
+        && request.resource.data.get('authorName', '').size() <= 80
         && request.resource.data.get('usernameTag', '') is string
-        && request.resource.data.usernameTag.size() <= 40
+        && request.resource.data.get('usernameTag', '').size() <= 40
         && request.resource.data.get('imgprofile', '') is string
-        && request.resource.data.imgprofile.size() <= 2048
+        && request.resource.data.get('imgprofile', '').size() <= 2048
         && request.resource.data.get('text', '') is string
-        && request.resource.data.text.size() <= 5000
+        && request.resource.data.get('text', '').size() <= 5000
         && request.resource.data.get('mediaUrl', '') is string
-        && request.resource.data.mediaUrl.size() <= 2048
+        && request.resource.data.get('mediaUrl', '').size() <= 2048
         && request.resource.data.get('mediaType', 'none') in [
           'none', 'youtube', 'image', 'audio', 'spotify', 'link'
         ]
         && request.resource.data.get('likeCount', 0) == 0
         && request.resource.data.get('likes', {}) is map
-        && request.resource.data.likes.size() == 0
+        && request.resource.data.get('likes', {}).size() == 0
         && request.resource.data.get('reports', 0) == 0
         && request.resource.data.keys().hasOnly([
           'authorId', 'authorName', 'usernameTag', 'imgprofile', 'role',
