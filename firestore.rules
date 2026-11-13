@@ -29,15 +29,29 @@ service cloud.firestore {
         && request.resource.data.get('diamonds', 0) == 0
         && request.resource.data.keys().hasOnly([
           'displayName', 'usernameTag', 'imgprofile', 'bannerUrl', 'bio',
-          'email', 'showEmail', 'role', 'diamonds', 'consent',
+          'role', 'diamonds', 'consent',
           'createdAt', 'updatedAt', 'provider'
         ]);
 
       allow update: if owns(userId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'displayName', 'usernameTag', 'imgprofile', 'bannerUrl',
-          'bio', 'email', 'showEmail', 'updatedAt'
-        ]);
+        && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'displayName', 'usernameTag', 'imgprofile', 'bannerUrl', 'bio', 'updatedAt'
+          ])
+          || (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'email', 'showEmail'
+            ])
+            && !request.resource.data.keys().hasAny(['email', 'showEmail'])
+          )
+          || (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'displayName', 'usernameTag', 'imgprofile', 'bannerUrl', 'bio',
+              'updatedAt', 'email', 'showEmail'
+            ])
+            && !request.resource.data.keys().hasAny(['email', 'showEmail'])
+          )
+        );
 
       allow delete: if false;
 
@@ -49,6 +63,25 @@ service cloud.firestore {
         allow delete: if owns(userId);
         allow update: if false;
       }
+    }
+
+    match /private_users/{userId} {
+      allow read: if owns(userId);
+      allow create, update: if owns(userId)
+        && request.resource.data.keys().hasOnly(['email', 'updatedAt'])
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 320;
+      allow delete: if false;
+    }
+
+    match /public_contact_emails/{userId} {
+      allow read: if true;
+      allow create, update: if owns(userId)
+        && request.resource.data.keys().hasOnly(['email', 'updatedAt'])
+        && request.resource.data.email is string
+        && request.resource.data.email.size() > 0
+        && request.resource.data.email.size() <= 320;
+      allow delete: if owns(userId);
     }
 
     match /posts/{postId} {
