@@ -104,14 +104,10 @@ service cloud.firestore {
           && request.resource.data.authorId == request.auth.uid
           && request.resource.data.postId == postId
           && validText(request.resource.data.text, 3000)
-          && request.resource.data.get('parentCommentId', null) is string
-             || (
-               signedIn()
-               && request.resource.data.authorId == request.auth.uid
-               && request.resource.data.postId == postId
-               && validText(request.resource.data.text, 3000)
-               && request.resource.data.get('parentCommentId', null) == null
-             );
+          && (
+            request.resource.data.get('parentCommentId', null) == null
+            || request.resource.data.get('parentCommentId', null) is string
+          );
 
         allow update: if signedIn()
           && resource.data.authorId == request.auth.uid
