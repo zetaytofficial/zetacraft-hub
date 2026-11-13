@@ -4,8 +4,8 @@
 
 const MINECRAFT_SERVER_IP = "zetacraft-ita.aternos.me";
 const APP_SHARE_URL = "https://zetacraft-hub.zetayt.workers.dev";
-const CDN_URL = "https://cdn.zetayt.workers.dev";
-const SUPPORT_EMAIL = 'assistenza.zetacraft@proton.me';
+const CDN_URL = "https://zetacraft-hub-upload.zetayt.workers.dev";
+const SUPPORT_EMAIL = 'zetalabs.by.zetayt@proton.me';
 const CONSENT_VERSION = '1.4';
 const LEGAL_PAGE = 'documenti-legali.html';
 
@@ -92,6 +92,7 @@ const TRUSTED_LINK_DOMAINS = [
   'play.google.com', 'apps.apple.com', 'store.steampowered.com', 'amazon.com', 'amazon.it', 'amzn.to',
   'youtube.com', 'youtu.be', 'twitch.tv', 'discord.com', 'discord.gg', 'github.com', 'gitlab.com',
   'wikipedia.org', 'google.com', 'proton.me', 'zetacraft-hub.zetayt.workers.dev',
+  'zetacraft-hub-upload.zetayt.workers.dev',
 ];
 
 const LINK_SHORTENERS = [
@@ -114,7 +115,7 @@ function checkLink(text) {
     return { status: 'blocked', message: 'Il link non è valido. Usa un indirizzo https://...' };
   }
   if (u.protocol !== 'https:') return { status: 'blocked', message: 'Sono ammessi solo link https://' };
-  
+
   const host = u.hostname.toLowerCase().replace(/\.$/, '');
   const onList = (list) => list.some((d) => host === d || host.endsWith('.' + d));
 
@@ -321,12 +322,12 @@ async function sendZetaMailMessage() {
 }
 
 // ----------------------------------------------------------------------------
-// 8. DIAMANTI E GESTIONE PROFILO
+// 8. DIAMANTI E GESTIONE PROFILO (CHIAVE UNIFICATA: zetacraft_diamonds)
 // ----------------------------------------------------------------------------
 async function addDiamondsToUser(amount = 1) {
-    let currentLocal = parseInt(localStorage.getItem('zetac_minigame_diamonds') || '0', 10);
+    let currentLocal = parseInt(localStorage.getItem('zetacraft_diamonds') || '0', 10);
     currentLocal += amount;
-    localStorage.setItem('zetac_minigame_diamonds', currentLocal);
+    localStorage.setItem('zetacraft_diamonds', currentLocal);
 
     if (!currentUserProfile || !db) return currentLocal;
 
@@ -344,7 +345,7 @@ async function addDiamondsToUser(amount = 1) {
         });
 
         currentUserProfile.diamonds = nuovoTotale;
-        localStorage.setItem('zetac_minigame_diamonds', nuovoTotale);
+        localStorage.setItem('zetacraft_diamonds', nuovoTotale);
         return nuovoTotale;
     } catch (e) {
         return currentLocal;
@@ -372,7 +373,7 @@ function updateUIWithProfile(profile) {
         if (displayNameElem) displayNameElem.innerText = `👋 ${profile.displayName} (${profile.role || 'user'})`;
         if (usernameTagElem) usernameTagElem.innerText = profile.usernameTag;
         if (zhAddressElem) zhAddressElem.innerText = getZetaMailAddress(profile.usernameTag);
-        
+
         if (profileImgElem) profileImgElem.src = profile.imgprofile || "https://visage.surgeplay.com/face/64/Steve";
 
         if (bannerPreview) {
@@ -395,7 +396,7 @@ function updateUIWithProfile(profile) {
         if (textInput) { textInput.disabled = false; textInput.placeholder = "Scrivi qualcosa..."; }
         if (linkInput) { linkInput.disabled = false; linkInput.placeholder = "Incolla un link https://..."; }
         if (publishBtn) { publishBtn.disabled = false; publishBtn.style.opacity = "1"; publishBtn.style.cursor = "pointer"; }
-        
+
         listenZetaMailMessages();
     } else {
         currentUserProfile = null;
@@ -515,7 +516,7 @@ async function handleAuthSubmit() {
 
     const emailInput = document.getElementById('auth-email-input');
     const passwordInput = document.getElementById('auth-password-input');
-    
+
     if (!emailInput || !passwordInput) return;
 
     const email = emailInput.value.trim();
@@ -697,7 +698,6 @@ async function saveProfileSettings() {
             alert("⚠️ Questo nome utente o indirizzo ZetaMail è già stato preso da un altro utente!");
             return;
         }
-
         const user = auth.currentUser;
         if (user && newPassword) {
             await user.updatePassword(newPassword);
@@ -717,7 +717,7 @@ async function saveProfileSettings() {
         await db.collection("users").doc(currentUserProfile.uid).update(updatedData);
 
         currentUserProfile = { ...currentUserProfile, ...updatedData };
-        
+
         if (localStorage.getItem('discord_user')) {
             localStorage.setItem('discord_user', JSON.stringify(currentUserProfile));
         }
@@ -735,7 +735,7 @@ async function saveProfileSettings() {
 
 async function openPublicProfile(userId) {
     if (!db) return;
-    
+
     try {
         const doc = await db.collection("users").doc(userId).get();
         if (!doc.exists) {
@@ -749,7 +749,6 @@ async function openPublicProfile(userId) {
         document.getElementById('pub-profile-tag').innerText = data.usernameTag || "@utente";
         document.getElementById('pub-profile-bio').innerText = data.bio || "Nessuna bio inserita.";
         document.getElementById('pub-profile-role').innerText = (data.role || "user").toUpperCase();
-
         const imgElem = document.getElementById('pub-profile-img');
         if (imgElem) imgElem.src = data.imgprofile || "https://visage.surgeplay.com/face/64/Steve";
 
@@ -769,7 +768,7 @@ async function openPublicProfile(userId) {
 
         let diamonds = data.diamonds || 0;
         if (currentUserProfile && currentUserProfile.uid === userId) {
-            const localDiamonds = parseInt(localStorage.getItem('zetac_minigame_diamonds') || '0', 10);
+            const localDiamonds = parseInt(localStorage.getItem('zetacraft_diamonds') || '0', 10);
             diamonds = Math.max(diamonds, localDiamonds);
         }
         const diamondsElem = document.getElementById('pub-profile-diamonds');
@@ -836,21 +835,21 @@ function closeBottomSheet() {
 function switchTab(tabId, titleText, element) {
     const currentActivePanel = document.querySelector('.tab-panel.active');
     const targetPanel = document.getElementById('tab-' + tabId);
-    
+
     if (currentActivePanel === targetPanel) return;
 
     if (currentActivePanel) {
         currentActivePanel.style.opacity = '0';
         currentActivePanel.style.transform = 'scale(0.96) translateY(-10px)';
-        
+
         setTimeout(() => {
             currentActivePanel.classList.remove('active');
-            
+
             if (targetPanel) {
                 targetPanel.classList.add('active');
                 targetPanel.style.opacity = '0';
                 targetPanel.style.transform = 'scale(0.96) translateY(10px)';
-                
+
                 setTimeout(() => {
                     targetPanel.style.opacity = '1';
                     targetPanel.style.transform = 'scale(1) translateY(0)';
@@ -862,7 +861,7 @@ function switchTab(tabId, titleText, element) {
         targetPanel.style.opacity = '1';
         targetPanel.style.transform = 'scale(1) translateY(0)';
     }
-    
+
     document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
     if (element && element.classList.contains('nav-item')) {
         element.classList.add('active');
@@ -899,7 +898,6 @@ function handleAcceptData() {
     isAudioEnabled = true;
     isDarkTheme = true;
     isSaveLoginEnabled = true;
-
     try {
         localStorage.setItem('zetacraft_audio_enabled', 'true');
         localStorage.setItem('zetacraft_dark_theme', 'true');
@@ -947,7 +945,7 @@ function applySettingsUI() {
     if (auth && typeof firebase !== 'undefined') {
         try {
             const persistence = isSaveLoginEnabled 
-                ? firebase.auth.Auth.Persistence.LOCAL 
+                ? firebase.auth.Auth.Persistence.LOCAL
                 : firebase.auth.Auth.Persistence.SESSION;
             auth.setPersistence(persistence);
         } catch(e) {}
@@ -1044,7 +1042,7 @@ async function getBlockedWords() {
     try {
         const snapshot = await db.collection("bannedworlds").get();
         const words = [];
-        
+
         snapshot.forEach(doc => {
             const data = doc.data();
             const possibleValues = Object.values(data);
@@ -1070,12 +1068,12 @@ async function filterProfanity(text) {
     if (!text) return "";
     let filteredText = text;
     const wordsToBlock = await getBlockedWords();
-    
+
     wordsToBlock.forEach(word => {
         if (!word) return;
         const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const regex = new RegExp(`\\b${escapedWord}\\b`, 'gi');
-        
+
         filteredText = filteredText.replace(regex, (match) => {
             return '*'.repeat(match.length);
         });
@@ -1197,7 +1195,6 @@ async function toggleLikePost(postId) {
                 likes[uid] = true;
                 count += 1;
             }
-
             transaction.update(postRef, { likes, likeCount: count });
         });
     } catch (e) {}
@@ -1215,7 +1212,7 @@ async function deletePost(postId) {
 async function submitComment(postId) {
     if (!currentUserProfile) return alert("Accedi per commentare!");
     if (!consentGiven() && !currentUserProfile.consent) return alert("Devi accettare i Termini prima di commentare.");
-    
+
     const commentInput = document.getElementById(`comment-input-${postId}`);
     if (!commentInput) return;
 
@@ -1290,7 +1287,7 @@ function renderCommunityPosts(postsList) {
         const canDelete = currentUid && (post.authorId === currentUid || isUserAdmin);
 
         const isStaffPost = staffRoles.includes(post.role) || post.id === 'fallback-1';
-        
+
         const cardStyle = isStaffPost 
             ? 'background: rgba(0, 212, 255, 0.1); border: 1px solid rgba(0, 212, 255, 0.4);' 
             : 'background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.08);';
@@ -1349,7 +1346,6 @@ function renderCommunityPosts(postsList) {
 function toggleCommentsView(postId) {
     const box = document.getElementById(`comments-box-${postId}`);
     if (!box) return;
-
     if (box.style.display === 'none' || box.style.display === '') {
         box.style.display = 'flex';
         listenToComments(postId);
@@ -1413,7 +1409,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const fragment = new URLSearchParams(window.location.hash.slice(1));
     const accessToken = fragment.get('access_token');
-    const REDIRECT_URI = window.location.origin + "/";
+    const REDIRECT_URI = new URL(APP_SHARE_URL).origin + "/";
 
     if (accessToken) {
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -1500,6 +1496,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(res => res.json())
             .then(async (userData) => {
                 if (userData.id) {
+
                     const figmaProfile = {
                         uid: "figma_" + userData.id,
                         displayName: userData.handle || "Utente Figma",
@@ -1606,7 +1603,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveProfileBtn = document.getElementById('save-profile-btn');
     if (saveProfileBtn) saveProfileBtn.addEventListener('click', saveProfileSettings);
 
-    // COLLEGAR IL TASTO DI CANCELLAZIONE ACCOUNT NELLE IMPOSTAZIONI PROFILO
     const deleteAccountBtn = document.getElementById('delete-account-btn');
     if (deleteAccountBtn) {
         deleteAccountBtn.addEventListener('click', () => requestAccountDeletion(auth.currentUser));
@@ -1662,7 +1658,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             localStorage.setItem('auth_provider', 'gitlab');
-            const gitlabAuthUrl = `https://gitlab.com/oauth/authorize?client_id=df0a115304055b3983475cfe16e63c2643c0df93a4b0cbb723f29c2e717867f2&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=read_user`;
+            const gitlabAuthUrl = `https://gitlab.com/oauth/authorize?client_id=09e863ef269de1c5326aecc47a0142695556ddb09a2791ea49011fe9c19d0592&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=read_user`;
             window.location.href = gitlabAuthUrl;
         });
     }
