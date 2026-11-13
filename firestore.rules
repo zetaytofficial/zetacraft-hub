@@ -74,10 +74,15 @@ service cloud.firestore {
             && request.resource.data.get('likes', {}) is map
             && request.resource.data.get('likes', {}).diff(resource.data.get('likes', {}))
               .affectedKeys().hasOnly([request.auth.uid])
+            && request.resource.data.get('likes', {}).get(request.auth.uid, false) is bool
+            && resource.data.get('likes', {}).get(request.auth.uid, false) is bool
+            && request.resource.data.get('likes', {}).get(request.auth.uid, false)
+              != resource.data.get('likes', {}).get(request.auth.uid, false)
             && request.resource.data.likeCount is int
             && request.resource.data.likeCount >= 0
-            && request.resource.data.likeCount <= resource.data.get('likeCount', 0) + 1
-            && request.resource.data.likeCount >= resource.data.get('likeCount', 0) - 1
+            && request.resource.data.likeCount
+              == resource.data.get('likeCount', 0)
+                + (request.resource.data.get('likes', {}).get(request.auth.uid, false) ? 1 : -1)
           )
           ||
           (
