@@ -255,7 +255,7 @@ function listenZetaMailMessages() {
     const myEmail = getZetaMailAddress(currentUserProfile.usernameTag);
 
     db.collection("private_messages")
-        .where("recipientEmail", "==", myEmail)
+        .where("recipientUid", "==", currentUserProfile.uid)
         .orderBy("createdAt", "desc")
         .onSnapshot(snapshot => {
             if (!listElem) return;
@@ -298,8 +298,11 @@ async function sendZetaMailMessage() {
 
     if (!rawRecipient || !rawText) return alert("Compila tutti i campi!");
 
-    let cleanRecipient = rawRecipient.replace('@', '');
-    if (!cleanRecipient.endsWith('zh.net')) cleanRecipient = cleanRecipient + '@zh.net';
+    const recipientTag = rawRecipient.startsWith('@') ? rawRecipient : '@' + rawRecipient.replace(/@zh\.net$/i, '');
+    const recipientQuery = await db.collection("users").where("usernameTag", "==", recipientTag).limit(1).get();
+    if (recipientQuery.empty) return alert("Destinatario ZetaMail non trovato.");
+    const recipientDoc = recipientQuery.docs[0];
+    if (recipientDoc.id === currentUserProfile.uid) return alert("Non puoi inviarti un messaggio da solo.");
 
     const text = await filterProfanity(rawText);
 
@@ -307,7 +310,8 @@ async function sendZetaMailMessage() {
         await db.collection("private_messages").add({
             senderUid: currentUserProfile.uid,
             senderEmail: getZetaMailAddress(currentUserProfile.usernameTag),
-            recipientEmail: cleanRecipient,
+            recipientUid: recipientDoc.id,
+            recipientEmail: getZetaMailAddress(recipientTag),
             text: text,
             read: false,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -1157,21 +1161,16 @@ async function publishCommunityPost() {
 }
 
 async function reportPost(postId) {
-    if (!confirm("🚩 Vuoi segnalare questo post allo staff per contenuto inappropriato?")) return;
-    if (!db) return alert("Database non disponibile.");
-
+    if (!currentUserProfile) return alert("Accedi per segnalare.");
+    if (!confirm("🚩 Vuoi segnalare questo post allo staff?")) return;
     try {
-        const postRef = db.collection("posts").doc(postId);
-        await db.runTransaction(async (transaction) => {
-            const postDoc = await transaction.get(postRef);
-            if (!postDoc.exists) return;
-            const currentReports = postDoc.data().reports || 0;
-            transaction.update(postRef, { reports: currentReports + 1 });
+        await db.collection("reports").add({
+            reporterId: currentUserProfile.uid, targetType: "post", targetId: postId,
+            reason: "Segnalazione community", createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            status: "open"
         });
-        alert("✅ Post segnalato con successo.");
-    } catch (e) {
-        alert("Errore durante la segnalazione: " + e.message);
-    }
+        alert("✅ Segnalazione inviata allo staff.");
+    } catch (e) { alert("Errore durante la segnalazione: " + e.message); }
 }
 
 async function toggleLikePost(postId) {
@@ -1223,6 +1222,9 @@ async function submitComment(postId) {
 
     try {
         await db.collection("posts").doc(postId).collection("comments").add({
+            postId,
+            authorId: currentUserProfile.uid,
+            parentCommentId: null,
             authorName: currentUserProfile.displayName,
             usernameTag: currentUserProfile.usernameTag,
             imgprofile: currentUserProfile.imgprofile,
@@ -1354,25 +1356,70 @@ function toggleCommentsView(postId) {
     }
 }
 
+async function replyToComment(postId, commentId) {
+    if (!currentUserProfile) return alert("Accedi per rispondere.");
+    const raw = prompt("Scrivi la tua risposta:");
+    if (!raw || !raw.trim()) return;
+    const text = await filterProfanity(raw.trim());
+    try {
+        await db.collection("posts").doc(postId).collection("comments").add({
+            postId, authorId: currentUserProfile.uid, parentCommentId: commentId,
+            authorName: currentUserProfile.displayName, usernameTag: currentUserProfile.usernameTag,
+            imgprofile: currentUserProfile.imgprofile, text,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    } catch (e) { alert("Errore invio risposta: " + e.message); }
+}
+
+async function reportComment(postId, commentId) {
+    if (!currentUserProfile) return alert("Accedi per segnalare.");
+    if (!confirm("Segnalare questo commento allo staff?")) return;
+    try {
+        await db.collection("reports").add({
+            reporterId: currentUserProfile.uid, targetType: "comment", targetId: commentId,
+            postId, reason: "Segnalazione commento", status: "open",
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        alert("Segnalazione inviata.");
+    } catch (e) { alert("Errore segnalazione: " + e.message); }
+}
+
+async function deleteComment(postId, commentId, authorId) {
+    if (!currentUserProfile || (currentUserProfile.uid !== authorId && !isCurrentUserStaff())) return alert("Non puoi eliminare questo commento.");
+    if (!confirm("Eliminare questo commento?")) return;
+    try { await db.collection("posts").doc(postId).collection("comments").doc(commentId).delete(); }
+    catch (e) { alert("Errore eliminazione: " + e.message); }
+}
+
+function isCurrentUserStaff() {
+    return !!(currentUserProfile && ["admin", "founder", "owner", "staff", "modder", "tester", "helper"].includes(currentUserProfile.role));
+}
+
 function listenToComments(postId) {
     const listElem = document.getElementById(`comments-list-${postId}`);
     if (!listElem || !db) return;
-
     db.collection("posts").doc(postId).collection("comments").orderBy("createdAt", "asc")
         .onSnapshot(snapshot => {
             if (snapshot.empty) {
-                listElem.innerHTML = `<span style="font-size:9px; color:#888;">Nessun commento ancora.</span>`;
+                listElem.innerHTML = `<span style="font-size:9px;color:#888;">Nessun commento ancora.</span>`;
                 return;
             }
             listElem.innerHTML = snapshot.docs.map(doc => {
                 const c = doc.data();
+                const mine = currentUserProfile && currentUserProfile.uid === c.authorId;
+                const indent = c.parentCommentId ? "margin-left:18px;border-left:2px solid #00d4ff;" : "";
                 return `
-                    <div style="background:rgba(255,255,255,0.05); padding:6px 8px; border-radius:8px; font-size:10px;">
-                        <strong style="color:#00d4ff;">${escapeHtml(c.authorName)}</strong>: <span style="color:#eee;">${formatUserText(c.text)}</span>
-                    </div>
-                `;
+                    <div style="background:rgba(255,255,255,0.05);padding:6px 8px;border-radius:8px;font-size:10px;${indent}">
+                        <strong style="color:#00d4ff;">${escapeHtml(c.authorName)}</strong>:
+                        <span style="color:#eee;">${formatUserText(c.text)}</span>
+                        <div style="display:flex;gap:10px;margin-top:5px;">
+                            <button onclick="replyToComment('${postId}','${doc.id}')" style="background:none;border:0;color:#00d4ff;font-size:9px;">↩ Rispondi</button>
+                            <button onclick="reportComment('${postId}','${doc.id}')" style="background:none;border:0;color:#aaa;font-size:9px;">🚩 Segnala</button>
+                            ${(mine || isCurrentUserStaff()) ? `<button onclick="deleteComment('${postId}','${doc.id}','${c.authorId || ''}')" style="background:none;border:0;color:#ff4757;font-size:9px;">🗑 Elimina</button>` : ''}
+                        </div>
+                    </div>`;
             }).join('');
-        });
+        }, err => { listElem.innerHTML = '<span style="color:#ff4757">Errore caricamento commenti.</span>'; });
 }
 
 function listenCommunityPosts() {
