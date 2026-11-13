@@ -329,31 +329,21 @@ async function sendZetaMailMessage() {
 // 8. DIAMANTI E GESTIONE PROFILO (CHIAVE UNIFICATA: zetacraft_diamonds)
 // ----------------------------------------------------------------------------
 async function addDiamondsToUser(amount = 1) {
-    let currentLocal = parseInt(localStorage.getItem('zetacraft_diamonds') || '0', 10);
-    currentLocal += amount;
-    localStorage.setItem('zetacraft_diamonds', currentLocal);
-
-    if (!currentUserProfile || !db) return currentLocal;
-
-    const userRef = db.collection("users").doc(currentUserProfile.uid);
-    try {
-        let nuovoTotale = 0;
-        await db.runTransaction(async (transaction) => {
-            const doc = await transaction.get(userRef);
-            let currentDbDiamonds = 0;
-            if (doc.exists && doc.data().diamonds !== undefined) {
-                currentDbDiamonds = doc.data().diamonds;
-            }
-            nuovoTotale = Math.max(currentDbDiamonds + amount, currentLocal);
-            transaction.update(userRef, { diamonds: nuovoTotale });
-        });
-
-        currentUserProfile.diamonds = nuovoTotale;
-        localStorage.setItem('zetacraft_diamonds', nuovoTotale);
-        return nuovoTotale;
-    } catch (e) {
-        return currentLocal;
+    // Il client non assegna valuta: il saldo è letto esclusivamente da Firestore.
+    // I premi saranno riattivati dopo l'integrazione dell'endpoint Worker autorizzato.
+    const requested = Number(amount);
+    if (!Number.isSafeInteger(requested) || requested <= 0) {
+        throw new Error("Quantità di diamanti non valida.");
     }
+    if (!auth || !auth.currentUser || !currentUserProfile || !db) {
+        throw new Error("Accedi con Firebase per visualizzare il saldo.");
+    }
+    const userRef = db.collection("users").doc(auth.currentUser.uid);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) throw new Error("Profilo utente non trovato.");
+    const balance = Number(userDoc.data().diamonds || 0);
+    currentUserProfile.diamonds = Number.isSafeInteger(balance) && balance >= 0 ? balance : 0;
+    return currentUserProfile.diamonds;
 }
 
 function updateUIWithProfile(profile) {
@@ -464,26 +454,9 @@ function initAuthListener() {
 }
 
 function checkExternalSessions() {
-    const savedDiscordUser = localStorage.getItem('discord_user');
-    if (savedDiscordUser) {
-        try {
-            const user = JSON.parse(savedDiscordUser);
-            updateUIWithProfile(user);
-            return true;
-        } catch(e) {
-            localStorage.removeItem('discord_user');
-        }
-    }
-    const savedCustomUser = localStorage.getItem('custom_oauth_user');
-    if (savedCustomUser) {
-        try {
-            const user = JSON.parse(savedCustomUser);
-            updateUIWithProfile(user);
-            return true;
-        } catch(e) {
-            localStorage.removeItem('custom_oauth_user');
-        }
-    }
+    // Le sessioni OAuth costruite dal frontend non sono autenticazioni affidabili.
+    localStorage.removeItem('discord_user');
+    localStorage.removeItem('custom_oauth_user');
     updateUIWithProfile(null);
     return false;
 }
@@ -631,17 +604,8 @@ async function handleSocialLogin(provider, providerName) {
 }
 
 async function handleLogout() {
-    if (localStorage.getItem('discord_user')) {
-        localStorage.removeItem('discord_user');
-        window.location.reload();
-        return;
-    }
-    if (localStorage.getItem('custom_oauth_user')) {
-        localStorage.removeItem('custom_oauth_user');
-        window.location.reload();
-        return;
-    }
     if (auth) await auth.signOut();
+    else updateUIWithProfile(null);
 }
 
 function openProfileSettingsModal() {
@@ -1015,6 +979,7 @@ function parseEmbedLink(url) {
 
     if (cleanUrl.includes('youtube.com/watch') || cleanUrl.includes('youtu.be/')) {
         let videoId = cleanUrl.includes('youtu.be/') ? cleanUrl.split('youtu.be/')[1].split('?')[0] : new URLSearchParams(cleanUrl.split('?')[1]).get('v');
+        if (!/^[A-Za-z0-9_-]{11}$/.test(videoId || '')) return { type: 'link', url: cleanUrl };
         return { type: 'youtube', url: `https://www.youtube.com/embed/${videoId}` };
     }
     if (/\.(jpeg|jpg|gif|png|webp)($|\?)/i.test(cleanUrl)) {
@@ -1023,9 +988,12 @@ function parseEmbedLink(url) {
     if (/\.(mp3|wav|ogg)($|\?)/i.test(cleanUrl)) {
         return { type: 'audio', url: cleanUrl };
     }
-    if (cleanUrl.includes('spotify.com/')) {
-        return { type: 'spotify', url: cleanUrl.replace('spotify.com/', 'spotify.com/embed/') };
-    }
+    try {
+        const parsed = new URL(cleanUrl);
+        if (parsed.protocol === 'https:' && (parsed.hostname === 'open.spotify.com' || parsed.hostname === 'spotify.com')) {
+            return { type: 'spotify', url: `https://open.spotify.com/embed${parsed.pathname}` };
+        }
+    } catch {}
 
     return { type: 'link', url: cleanUrl };
 }
@@ -1267,13 +1235,13 @@ function renderCommunityPosts(postsList) {
         let mediaHtml = "";
 
         if (post.mediaType === 'youtube') {
-            mediaHtml = `<div style="margin-top:8px; border-radius:12px; overflow:hidden; aspect-ratio:16/9;"><iframe src="${safeHttpsUrl(post.mediaUrl)}" style="width:100%; height:100%; border:none;"></iframe></div>`;
+            mediaHtml = `<div style="margin-top:8px; border-radius:12px; overflow:hidden; aspect-ratio:16/9;"><iframe src="${safeHttpsUrl(post.mediaUrl)}" sandbox="allow-scripts allow-same-origin allow-presentation" referrerpolicy="strict-origin-when-cross-origin" style="width:100%; height:100%; border:none;" title="Video YouTube" loading="lazy"></iframe></div>`;
         } else if (post.mediaType === 'image') {
             mediaHtml = `<img src="${safeHttpsUrl(post.mediaUrl)}" style="width:100%; max-height:240px; object-fit:cover; border-radius:12px; margin-top:8px;" />`;
         } else if (post.mediaType === 'audio') {
             mediaHtml = `<audio controls style="width:100%; margin-top:8px;"><source src="${safeHttpsUrl(post.mediaUrl)}"></audio>`;
         } else if (post.mediaType === 'spotify') {
-            mediaHtml = `<iframe src="${safeHttpsUrl(post.mediaUrl)}" width="100%" height="80" frameborder="0" style="border-radius:12px; margin-top:8px;"></iframe>`;
+            mediaHtml = `<iframe src="${safeHttpsUrl(post.mediaUrl)}" sandbox="allow-scripts allow-same-origin allow-presentation" referrerpolicy="strict-origin-when-cross-origin" width="100%" height="80" frameborder="0" style="border-radius:12px; margin-top:8px;" title="Player Spotify" loading="lazy"></iframe>`;
         } else if (post.mediaType === 'link' && post.mediaUrl) {
             const linkRes = checkLink(post.mediaUrl);
             mediaHtml = `
