@@ -1263,7 +1263,7 @@ function renderCommunityPosts(postsList) {
             : 'background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.08);';
 
         const staffBadge = isStaffPost 
-            ? `<span style="background: linear-gradient(135deg, #00d4ff, #0077ff); color: #fff; font-size: 8px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-left: 6px;">🛡️ ${(post.role || 'STAFF').toUpperCase()}</span>` 
+            ? `<span style="background: linear-gradient(135deg, #00d4ff, #0077ff); color: #fff; font-size: 8px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-left: 6px;">🛡️ ${escapeHtml((post.role || 'STAFF').toUpperCase())}</span>` 
             : '';
 
         return `
@@ -1296,14 +1296,14 @@ function renderCommunityPosts(postsList) {
                     </button>
                 </div>
 
-                <div id="comments-box-${post.id}" style="display:none; margin-top:10px; flex-direction:column; gap:8px;">
-                    <div id="comments-list-${post.id}" style="display:flex; flex-direction:column; gap:6px; max-height:150px; overflow-y:auto;">
+                <div id="comments-box-${escapeHtml(post.id)}" style="display:none; margin-top:10px; flex-direction:column; gap:8px;">
+                    <div id="comments-list-${escapeHtml(post.id)}" style="display:flex; flex-direction:column; gap:6px; max-height:150px; overflow-y:auto;">
                         <span style="font-size:10px; color:#888;">Caricamento commenti...</span>
                     </div>
 
                     ${currentUid ? `
                         <div style="display:flex; gap:6px; margin-top:4px;">
-                            <input type="text" id="comment-input-${post.id}" class="app-input" placeholder="Scrivi un commento..." style="font-size:10px; padding:6px 10px;" />
+                            <input type="text" id="comment-input-${escapeHtml(post.id)}" class="app-input" placeholder="Scrivi un commento..." style="font-size:10px; padding:6px 10px;" />
                             <button onclick="submitComment(${inlineJsArg(post.id)})" class="liquid-btn" style="padding:6px 10px; font-size:10px;">INVIA</button>
                         </div>
                     ` : '<span style="font-size:9px; color:#aaa;">Accedi per commentare.</span>'}
