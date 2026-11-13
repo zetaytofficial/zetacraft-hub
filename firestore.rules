@@ -101,12 +101,22 @@ service cloud.firestore {
         allow read: if true;
 
         allow create: if signedIn()
+          && request.resource.data.keys().hasOnly([
+            'postId', 'authorId', 'parentCommentId', 'authorName',
+            'usernameTag', 'imgprofile', 'text', 'createdAt'
+          ])
           && request.resource.data.authorId == request.auth.uid
           && request.resource.data.postId == postId
           && validText(request.resource.data.text, 3000)
+          && validText(request.resource.data.authorName, 80)
+          && request.resource.data.get('usernameTag', '') is string
+          && request.resource.data.get('imgprofile', '') is string
           && (
             request.resource.data.get('parentCommentId', null) == null
-            || request.resource.data.get('parentCommentId', null) is string
+            || (
+              request.resource.data.parentCommentId is string
+              && exists(/databases/$(database)/documents/posts/$(postId)/comments/$(request.resource.data.parentCommentId))
+            )
           );
 
         allow update: if signedIn()
