@@ -76,11 +76,19 @@ function formatUserText(value) {
 
 function safeHttpsUrl(value) {
   try {
-    const u = new URL(String(value).trim());
-    return u.protocol === 'https:' ? u.href : '';
+    const u = new URL(String(value || '').trim());
+    if (u.protocol !== 'https:' || !u.hostname || u.username || u.password) return '';
+    return u.href;
   } catch {
     return '';
   }
+}
+
+function safeProfileBanner(value) {
+  const raw = String(value || '').trim();
+  if (/^#[0-9a-f]{6}$/i.test(raw)) return { color: raw, image: '' };
+  const image = safeHttpsUrl(raw);
+  return image ? { color: 'transparent', image } : { color: '#0077ff', image: '' };
 }
 
 // ----------------------------------------------------------------------------
@@ -368,20 +376,12 @@ function updateUIWithProfile(profile) {
         if (usernameTagElem) usernameTagElem.innerText = profile.usernameTag;
         if (zhAddressElem) zhAddressElem.innerText = getZetaMailAddress(profile.usernameTag);
 
-        if (profileImgElem) profileImgElem.src = profile.imgprofile || "https://visage.surgeplay.com/face/64/Steve";
+        if (profileImgElem) profileImgElem.src = safeHttpsUrl(profile.imgprofile) || "https://visage.surgeplay.com/face/64/Steve";
 
         if (bannerPreview) {
-            if (profile.bannerUrl) {
-                if (profile.bannerUrl.startsWith('#')) {
-                    bannerPreview.style.backgroundImage = 'none';
-                    bannerPreview.style.backgroundColor = profile.bannerUrl;
-                } else {
-                    bannerPreview.style.backgroundImage = `url('${profile.bannerUrl}')`;
-                    bannerPreview.style.backgroundColor = 'transparent';
-                }
-            } else {
-                bannerPreview.style.backgroundImage = 'linear-gradient(135deg, #0077ff, #00d4ff)';
-            }
+            const banner = safeProfileBanner(profile.bannerUrl);
+            bannerPreview.style.backgroundImage = banner.image ? `url("${banner.image}")` : 'linear-gradient(135deg, #0077ff, #00d4ff)';
+            bannerPreview.style.backgroundColor = banner.color;
         }
 
         if (loggedBox) loggedBox.style.display = "flex";
@@ -644,6 +644,18 @@ async function saveProfileSettings() {
         alert("Il nome visualizzato e il nome utente sono obbligatori!");
         return;
     }
+    if (displayName.length > 40 || usernameTag.length > 32 || bio.length > 300) {
+        alert("Nome massimo 40 caratteri, username 32 e bio 300.");
+        return;
+    }
+    if (imgprofile && !safeHttpsUrl(imgprofile)) {
+        alert("L'immagine profilo deve essere un URL HTTPS valido.");
+        return;
+    }
+    if (bannerUrl && !/^#[0-9a-f]{6}$/i.test(bannerUrl) && !safeHttpsUrl(bannerUrl)) {
+        alert("La copertina deve essere un colore HEX (#RRGGBB) oppure un URL HTTPS valido.");
+        return;
+    }
 
     if (!usernameTag.startsWith('@')) usernameTag = '@' + usernameTag;
     usernameTag = usernameTag.toLowerCase();
@@ -686,13 +698,6 @@ async function saveProfileSettings() {
 
         currentUserProfile = { ...currentUserProfile, ...updatedData };
 
-        if (localStorage.getItem('discord_user')) {
-            localStorage.setItem('discord_user', JSON.stringify(currentUserProfile));
-        }
-        if (localStorage.getItem('custom_oauth_user')) {
-            localStorage.setItem('custom_oauth_user', JSON.stringify(currentUserProfile));
-        }
-
         updateUIWithProfile(currentUserProfile);
         closeProfileSettingsModal();
         alert("✅ Profilo aggiornato con successo!");
@@ -718,27 +723,17 @@ async function openPublicProfile(userId) {
         document.getElementById('pub-profile-bio').innerText = data.bio || "Nessuna bio inserita.";
         document.getElementById('pub-profile-role').innerText = (data.role || "user").toUpperCase();
         const imgElem = document.getElementById('pub-profile-img');
-        if (imgElem) imgElem.src = data.imgprofile || "https://visage.surgeplay.com/face/64/Steve";
+        if (imgElem) imgElem.src = safeHttpsUrl(data.imgprofile) || "https://visage.surgeplay.com/face/64/Steve";
 
         const bannerElem = document.getElementById('pub-profile-banner');
-        const bannerUrl = data.bannerUrl || "";
+        const banner = safeProfileBanner(data.bannerUrl);
         if (bannerElem) {
-            if (bannerUrl.startsWith('#')) {
-                bannerElem.style.backgroundImage = 'none';
-                bannerElem.style.backgroundColor = bannerUrl;
-            } else if (bannerUrl) {
-                bannerElem.style.backgroundImage = `url('${bannerUrl}')`;
-                bannerElem.style.backgroundColor = 'transparent';
-            } else {
-                bannerElem.style.backgroundImage = 'linear-gradient(135deg, #0077ff, #00d4ff)';
-            }
+            bannerElem.style.backgroundImage = banner.image ? `url("${banner.image}")` : 'linear-gradient(135deg, #0077ff, #00d4ff)';
+            bannerElem.style.backgroundColor = banner.color;
         }
 
-        let diamonds = data.diamonds || 0;
-        if (currentUserProfile && currentUserProfile.uid === userId) {
-            const localDiamonds = parseInt(localStorage.getItem('zetacraft_diamonds') || '0', 10);
-            diamonds = Math.max(diamonds, localDiamonds);
-        }
+        const diamondsValue = Number(data.diamonds || 0);
+        const diamonds = Number.isSafeInteger(diamondsValue) && diamondsValue >= 0 ? diamondsValue : 0;
         const diamondsElem = document.getElementById('pub-profile-diamonds');
         if (diamondsElem) diamondsElem.innerText = diamonds;
 
