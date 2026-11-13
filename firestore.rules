@@ -29,7 +29,7 @@ service cloud.firestore {
         && request.resource.data.get('diamonds', 0) == 0
         && request.resource.data.keys().hasOnly([
           'displayName', 'usernameTag', 'imgprofile', 'bannerUrl', 'bio',
-          'role', 'diamonds', 'consent',
+          'role', 'diamonds',
           'createdAt', 'updatedAt', 'provider'
         ]);
 
@@ -68,9 +68,11 @@ service cloud.firestore {
     match /private_users/{userId} {
       allow read: if owns(userId);
       allow create, update: if owns(userId)
-        && request.resource.data.keys().hasOnly(['email', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['email', 'consent', 'updatedAt'])
         && request.resource.data.email is string
-        && request.resource.data.email.size() <= 320;
+        && request.resource.data.email.size() <= 320
+        && (!request.resource.data.keys().hasAny(['consent'])
+          || request.resource.data.consent is map);
       allow delete: if false;
     }
 
