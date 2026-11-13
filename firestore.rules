@@ -6,11 +6,11 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Ruoli assegnati esclusivamente da un ambiente amministrativo fidato
-    // tramite Firebase Authentication Custom Claims.
     function staff() {
       return signedIn()
-        && request.auth.token.get('role', '') in ['admin', 'staff', 'founder', 'owner', 'modder', 'tester', 'helper'];
+        && request.auth.token.get('role', '') in [
+          'admin', 'staff', 'founder', 'owner', 'modder', 'tester', 'helper'
+        ];
     }
 
     function owns(uid) {
@@ -21,9 +21,6 @@ service cloud.firestore {
       return value is string && value.size() > 0 && value.size() <= maxLength;
     }
 
-    // PROFILI: i documenti sono attualmente letti pubblicamente dall'app.
-    // Nota: i campi email vanno spostati in una sottocollezione privata
-    // prima di poter rendere privati i dati email con regole Firestore.
     match /users/{userId} {
       allow read: if true;
 
@@ -44,7 +41,6 @@ service cloud.firestore {
 
       allow delete: if false;
 
-      // Lista utenti bloccati, leggibile e modificabile soltanto dal proprietario.
       match /blocked/{blockedUid} {
         allow read: if owns(userId);
         allow create: if owns(userId)
@@ -55,7 +51,6 @@ service cloud.firestore {
       }
     }
 
-    // POST COMMUNITY
     match /posts/{postId} {
       allow read: if true;
 
@@ -70,7 +65,6 @@ service cloud.firestore {
           'reports', 'createdAt'
         ]);
 
-      // Like: ogni utente può modificare soltanto la propria chiave.
       allow update: if signedIn()
         && request.resource.data.authorId == resource.data.authorId
         && (
@@ -96,7 +90,6 @@ service cloud.firestore {
       allow delete: if signedIn()
         && (resource.data.authorId == request.auth.uid || staff());
 
-      // COMMENTI E RISPOSTE
       match /comments/{commentId} {
         allow read: if true;
 
@@ -115,7 +108,9 @@ service cloud.firestore {
             request.resource.data.get('parentCommentId', null) == null
             || (
               request.resource.data.parentCommentId is string
-              && request.resource.data.parentCommentId.matches('^[A-Za-z0-9_-]{1,128}
+              && exists(
+                /databases/$(database)/documents/posts/$(postId)/comments/$(request.resource.data.parentCommentId)
+              )
             )
           );
 
@@ -131,7 +126,6 @@ service cloud.firestore {
       }
     }
 
-    // SEGNALAZIONI: l'autore può crearle; soltanto lo staff può leggerle/gestirle.
     match /reports/{reportId} {
       allow create: if signedIn()
         && request.resource.data.reporterId == request.auth.uid
@@ -147,7 +141,6 @@ service cloud.firestore {
       allow read, update, delete: if staff();
     }
 
-    // ZETAMAIL: i nuovi messaggi devono avere senderUid e recipientUid.
     match /private_messages/{messageId} {
       allow create: if signedIn()
         && request.resource.data.senderUid == request.auth.uid
@@ -173,95 +166,16 @@ service cloud.firestore {
       allow delete: if staff();
     }
 
-    // PAROLE BANNATE
     match /bannedworlds/{wordId} {
       allow read: if true;
       allow create, update, delete: if staff();
     }
 
-    // STATO SERVER
     match /system/{document} {
       allow read: if true;
       allow create, update, delete: if staff();
     }
 
-    // Tutto ciò che non è dichiarato sopra resta negato.
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-})
-              && exists(/databases/$(database)/documents/posts/$(postId)/comments/$(request.resource.data.parentCommentId))
-            )
-          );
-
-        allow update: if signedIn()
-          && resource.data.authorId == request.auth.uid
-          && request.resource.data.authorId == resource.data.authorId
-          && request.resource.data.postId == resource.data.postId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text'])
-          && validText(request.resource.data.text, 3000);
-
-        allow delete: if signedIn()
-          && (resource.data.authorId == request.auth.uid || staff());
-      }
-    }
-
-    // SEGNALAZIONI: l'autore può crearle; soltanto lo staff può leggerle/gestirle.
-    match /reports/{reportId} {
-      allow create: if signedIn()
-        && request.resource.data.reporterId == request.auth.uid
-        && request.resource.data.targetType in ['post', 'comment', 'user']
-        && validText(request.resource.data.targetId, 200)
-        && validText(request.resource.data.reason, 1000)
-        && request.resource.data.get('status', 'open') == 'open'
-        && request.resource.data.keys().hasOnly([
-          'reporterId', 'targetType', 'targetId', 'postId',
-          'reason', 'status', 'createdAt'
-        ]);
-
-      allow read, update, delete: if staff();
-    }
-
-    // ZETAMAIL: i nuovi messaggi devono avere senderUid e recipientUid.
-    match /private_messages/{messageId} {
-      allow create: if signedIn()
-        && request.resource.data.senderUid == request.auth.uid
-        && request.resource.data.recipientUid is string
-        && request.resource.data.recipientUid != request.auth.uid
-        && validText(request.resource.data.text, 10000)
-        && request.resource.data.keys().hasOnly([
-          'senderUid', 'senderEmail', 'recipientUid', 'recipientEmail',
-          'text', 'read', 'createdAt'
-        ]);
-
-      allow read: if signedIn()
-        && (
-          resource.data.senderUid == request.auth.uid
-          || resource.data.recipientUid == request.auth.uid
-        );
-
-      allow update: if signedIn()
-        && resource.data.recipientUid == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
-        && request.resource.data.read is bool;
-
-      allow delete: if staff();
-    }
-
-    // PAROLE BANNATE
-    match /bannedworlds/{wordId} {
-      allow read: if true;
-      allow create, update, delete: if staff();
-    }
-
-    // STATO SERVER
-    match /system/{document} {
-      allow read: if true;
-      allow create, update, delete: if staff();
-    }
-
-    // Tutto ciò che non è dichiarato sopra resta negato.
     match /{document=**} {
       allow read, write: if false;
     }
