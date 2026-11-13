@@ -258,13 +258,15 @@ function getZetaMailAddress(usernameTag) {
     return `${clean}@zh.net`;
 }
 
-async function syncAccountEmail(uid, email, showEmail) {
+async function syncAccountEmail(uid, email, showEmail, consent) {
     if (!db || !uid) throw new Error("Account non disponibile.");
     const normalizedEmail = String(email || '').trim().toLowerCase();
-    await db.collection("private_users").doc(uid).set({
+    const privateData = {
         email: normalizedEmail,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
+    };
+    if (consent && typeof consent === 'object') privateData.consent = consent;
+    await db.collection("private_users").doc(uid).set(privateData, { merge: true });
     const publicRef = db.collection("public_contact_emails").doc(uid);
     if (showEmail && normalizedEmail) {
         await publicRef.set({ email: normalizedEmail, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
@@ -465,23 +467,32 @@ function initAuthListener() {
             try {
                 const hasLegacyEmail = Object.prototype.hasOwnProperty.call(profileData, 'email')
                     || Object.prototype.hasOwnProperty.call(profileData, 'showEmail');
+                const hasLegacyConsent = Object.prototype.hasOwnProperty.call(profileData, 'consent');
+                const legacyEmail = String(profileData.email || user.email || '').trim();
+                const legacyShow = !!profileData.showEmail;
+                const legacyConsent = profileData.consent || null;
+                await syncAccountEmail(
+                    user.uid,
+                    user.email || legacyEmail,
+                    hasLegacyEmail ? legacyShow : false,
+                    legacyConsent
+                );
+                const fieldsToDelete = {};
                 if (hasLegacyEmail) {
-                    const legacyEmail = String(profileData.email || user.email || '').trim();
-                    const legacyShow = !!profileData.showEmail;
-                    await syncAccountEmail(user.uid, user.email || legacyEmail, legacyShow);
-                    await db.collection("users").doc(user.uid).update({
-                        email: firebase.firestore.FieldValue.delete(),
-                        showEmail: firebase.firestore.FieldValue.delete()
-                    });
+                    fieldsToDelete.email = firebase.firestore.FieldValue.delete();
+                    fieldsToDelete.showEmail = firebase.firestore.FieldValue.delete();
+                }
+                if (hasLegacyConsent) fieldsToDelete.consent = firebase.firestore.FieldValue.delete();
+                if (Object.keys(fieldsToDelete).length) {
+                    await db.collection("users").doc(user.uid).update(fieldsToDelete);
+                }
+                if (hasLegacyEmail) {
                     profileData.showEmail = legacyShow;
                 } else {
-                    await db.collection("private_users").doc(user.uid).set({
-                        email: String(user.email || '').trim().toLowerCase(),
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    }, { merge: true });
                     const publicContact = await db.collection("public_contact_emails").doc(user.uid).get();
                     profileData.showEmail = publicContact.exists;
                 }
+                profileData.consent = legacyConsent || null;
                 profileData.email = user.email || '';
             } catch (privacyError) {
                 console.warn("Migrazione email privata non completata:", privacyError);
@@ -584,11 +595,10 @@ async function handleAuthSubmit() {
                 bio: "",
                 role: "user",
                 diamonds: 0,
-                consent: consentRecord(),
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            await syncAccountEmail(user.uid, user.email || email, false);
+            await syncAccountEmail(user.uid, user.email || email, false, consentRecord());
             alert("Registrazione completata con successo!");
         } else {
             await auth.signInWithEmailAndPassword(email, password);
@@ -631,10 +641,9 @@ async function handleSocialLogin(provider, providerName) {
                 bio: "",
                 role: "user",
                 diamonds: 0,
-                consent: consentRecord(),
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-            await syncAccountEmail(user.uid, user.email || "", false);
+            await syncAccountEmail(user.uid, user.email || "", false, consentRecord());
         }
     } catch (error) {
         alert(`Errore Accesso con ${providerName}: ${error.message}`);
