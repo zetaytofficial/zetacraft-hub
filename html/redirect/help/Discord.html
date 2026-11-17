@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZetaCraft Hub - Reindirizzamento a Discord</title>
+<!-- Niente meta refresh: il redirect è SOLO via JS, così "Annulla" può fermarlo davvero -->
+<link rel="canonical" href="https://discord.gg/YJp2vkaK34">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{background:#030712;color:#f8fafc;font-family:'Plus Jakarta Sans',system-ui,sans-serif;overflow-x:hidden;min-height:100vh;display:flex;flex-direction:column;justify-content:space-between;position:relative}
+a{color:inherit;text-decoration:none}
+.bg{position:fixed;inset:0;overflow:hidden;z-index:0;pointer-events:none}
+.blob{position:absolute;border-radius:50%;filter:blur(80px);opacity:.75;animation:float 18s infinite ease-in-out alternate;will-change:transform}
+.blob-1{top:10%;left:15%;width:420px;height:420px;background:radial-gradient(circle,#00f2fe 0%,#4facfe 100%);animation-duration:16s}
+.blob-2{bottom:15%;right:15%;width:500px;height:500px;background:radial-gradient(circle,#0052d4 0%,#4364f7 50%,#6fb1fc 100%);animation-duration:22s;animation-delay:-5s}
+.blob-3{top:45%;left:50%;transform:translate(-50%,-50%);width:350px;height:350px;background:radial-gradient(circle,#0284c7 0%,#1e40af 100%);animation-duration:19s;animation-delay:-9s}
+@keyframes float{0%{transform:translate(0,0) scale(1) rotate(0)}33%{transform:translate(60px,-80px) scale(1.15) rotate(120deg)}66%{transform:translate(-40px,50px) scale(.88) rotate(240deg)}100%{transform:translate(0,0) scale(1) rotate(360deg)}}
+.grid{position:absolute;inset:0;opacity:.6;background-image:radial-gradient(rgba(255,255,255,.08) 1px,transparent 1px);background-size:32px 32px}
+header{position:relative;z-index:10;width:100%;padding:24px}
+.header-inner{max-width:80rem;margin:0 auto;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:14px}
+.logo-img{padding:10px;border-radius:16px;background:rgba(255,255,255,.1);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.2);box-shadow:0 10px 25px rgba(0,0,0,.3)}
+.logo-img img{width:36px;height:36px;object-fit:contain;display:block;filter:drop-shadow(0 0 8px rgba(56,189,248,.6))}
+.logo-text{display:flex;flex-direction:column}
+.logo-name{font-size:24px;font-weight:800;letter-spacing:-.02em;background:linear-gradient(to right,#fff,#e0f2fe,#7dd3fc);-webkit-background-clip:text;background-clip:text;color:transparent}
+.logo-name span{color:#38bdf8;-webkit-text-fill-color:#38bdf8}
+.logo-sub{font-size:10px;text-transform:uppercase;letter-spacing:.2em;color:rgba(186,230,253,.6);font-weight:600}
+.badge{display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;background:rgba(8,47,73,.4);border:1px solid rgba(56,189,248,.3);backdrop-filter:blur(12px);font-size:12px;font-weight:500;color:#bae6fd}
+.dot{width:8px;height:8px;border-radius:50%;background:#38bdf8;animation:ping 1.5s infinite}
+@keyframes ping{0%{box-shadow:0 0 0 0 rgba(56,189,248,.6)}100%{box-shadow:0 0 0 8px rgba(56,189,248,0)}}
+main{position:relative;z-index:10;flex:1;display:flex;align-items:center;justify-content:center;padding:48px 16px}
+.card{width:100%;max-width:672px;text-align:center;padding:56px;border-radius:24px;background:linear-gradient(135deg,rgba(255,255,255,.12) 0%,rgba(255,255,255,.03) 100%);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.18);box-shadow:0 30px 60px -12px rgba(0,0,0,.5),0 18px 36px -18px rgba(0,198,255,.3),inset 0 1px 0 0 rgba(255,255,255,.35),inset 0 -1px 0 0 rgba(0,0,0,.2);position:relative;overflow:hidden;transition:transform .4s cubic-bezier(.175,.885,.32,1.275),box-shadow .4s ease}
+.card::before{content:'';position:absolute;top:0;left:-150%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent);transform:skewX(-25deg);transition:left .8s ease;pointer-events:none}
+.card:hover::before{left:150%}
+.icon-wrap{margin-bottom:32px;position:relative;display:inline-flex;justify-content:center;align-items:center}
+.icon-glow{position:absolute;inset:0;border-radius:50%;background:rgba(56,189,248,.2);filter:blur(20px);animation:pulse 2s infinite}
+.icon{width:96px;height:96px;border-radius:16px;background:linear-gradient(135deg,rgba(56,189,248,.2),rgba(37,99,235,.2));border:1px solid rgba(125,211,252,.3);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(12px);box-shadow:inset 0 2px 8px rgba(255,255,255,.15);animation:glow 2.5s infinite ease-in-out;position:relative}
+.icon i{font-size:40px;color:#7dd3fc}
+@keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
+@keyframes glow{0%,100%{filter:drop-shadow(0 0 15px rgba(56,189,248,.8));opacity:1}50%{filter:drop-shadow(0 0 35px rgba(56,189,248,1));opacity:.85}}
+h1{font-size:36px;font-weight:800;letter-spacing:-.02em;line-height:1.15;text-transform:uppercase;text-shadow:0 0 25px rgba(56,189,248,.6);margin-bottom:16px}
+h1 .grad{background:linear-gradient(to right,#7dd3fc,#a5f3fc,#60a5fa);-webkit-background-clip:text;background-clip:text;color:transparent}
+.subtitle{font-size:19px;font-weight:600;color:rgba(224,242,254,.9);letter-spacing:.05em;text-transform:uppercase;margin-bottom:32px}
+.desc{font-size:16px;color:rgba(203,213,225,.8);max-width:28rem;margin:0 auto 40px;line-height:1.6;font-weight:300}
+.countdown{font-size:14px;color:rgba(203,213,225,.8);margin-bottom:24px}
+.countdown b{font-size:28px;font-weight:800;color:#7dd3fc;text-shadow:0 0 25px rgba(56,189,248,.6)}
+.buttons{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+.btn{display:flex;align-items:center;justify-content:center;gap:12px;padding:14px 32px;border-radius:16px;font-weight:600;font-size:15px;cursor:pointer;border:1px solid transparent;transition:all .3s ease;width:100%}
+.btn-primary{background:linear-gradient(135deg,rgba(56,189,248,.25),rgba(2,132,199,.4));backdrop-filter:blur(12px);border-color:rgba(255,255,255,.25);box-shadow:0 8px 20px rgba(2,132,199,.3),inset 0 1px 0 rgba(255,255,255,.4);color:#fff}
+.btn-primary:hover{background:linear-gradient(135deg,rgba(56,189,248,.45),rgba(2,132,199,.6));border-color:rgba(255,255,255,.45);transform:translateY(-2px);box-shadow:0 12px 28px rgba(56,189,248,.45),inset 0 1px 0 rgba(255,255,255,.6)}
+.btn-ghost{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:#e0f2fe;backdrop-filter:blur(12px)}
+.btn-ghost:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2)}
+.btn-ghost:disabled{opacity:.6;pointer-events:none}
+.fallback{margin-top:20px;font-size:12px;color:rgba(148,163,184,.7)}
+.fallback a{color:#7dd3fc;text-decoration:underline;text-underline-offset:2px}
+.progress{margin-top:40px;padding-top:32px;border-top:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;gap:8px}
+.progress-row{display:flex;justify-content:space-between;font-size:12px;font-weight:500;color:rgba(186,230,253,.7)}
+.progress-row b{color:#38bdf8}
+.bar{width:100%;height:8px;border-radius:999px;background:rgba(2,6,23,.6);overflow:hidden;border:1px solid rgba(255,255,255,.1);padding:2px}
+.bar-fill{height:100%;background:linear-gradient(to right,#06b6d4,#38bdf8,#2563eb);border-radius:999px;transition:width 1s ease;width:0%}
+footer{position:relative;z-index:10;width:100%;padding:24px 16px;text-align:center}
+footer p{font-size:12px;color:rgba(186,230,253,.5);letter-spacing:.05em}
+footer strong{color:rgba(125,211,252,.8)}
+@media(min-width:640px){.buttons{flex-direction:row;flex-wrap:wrap}.btn{width:auto}h1{font-size:40px}}
+@media(max-width:640px){.badge{display:none}.card{padding:32px 24px}h1{font-size:28px}.logo-name{font-size:20px}}
+</style>
+</head>
+<body>
+<div class="bg"><div class="blob blob-1"></div><div class="blob blob-2"></div><div class="blob blob-3"></div><div class="grid"></div></div>
+<header><div class="header-inner">
+<a href="https://zetacraft-hub.zetayt.workers.dev/" class="logo"><div class="logo-img"><img src="/logo-app.png" alt="ZetaCraft Hub Logo" onerror="this.onerror=null;this.src='/favicon.ico';"></div><div class="logo-text"><span class="logo-name">ZetaCraft <span>Hub</span></span><span class="logo-sub">Official Network</span></div></a>
+<div class="badge"><span class="dot"></span><span>Reindirizzamento a Discord</span></div>
+</div></header>
+<main><div id="tiltCard" class="card">
+<div class="icon-wrap"><div class="icon-glow"></div><div class="icon"><i class="fa-brands fa-discord"></i></div></div>
+<h1>TI STIAMO PORTANDO<br><span class="grad">SU DISCORD</span></h1>
+<p class="subtitle">Reindirizzamento in corso</p>
+<p class="desc">Verrai reindirizzato automaticamente al server Discord ufficiale di ZetaCraft Hub tra pochi secondi. Unisciti alla community per restare aggiornato, chattare e giocare con noi.</p>
+<p class="countdown">Reindirizzamento tra <b id="countdown">5</b> secondi...</p>
+<div class="buttons">
+<a href="https://discord.gg/YJp2vkaK34" class="btn btn-primary"><i class="fa-brands fa-discord"></i><span>Entra subito su Discord</span><i class="fa-solid fa-arrow-right" style="font-size:12px"></i></a>
+<button onclick="cancelRedirect()" id="cancelBtn" class="btn btn-ghost"><i class="fa-solid fa-pause" style="color:#38bdf8"></i><span id="cancelLabel">Annulla reindirizzamento</span></button>
+<a href="https://zetacraft-hub.zetayt.workers.dev/" class="btn btn-ghost"><i class="fa-solid fa-house" style="color:#38bdf8"></i><span>Torna alla Home</span></a>
+</div>
+<p class="fallback">Se non vieni reindirizzato, <a href="https://discord.gg/YJp2vkaK34">clicca qui</a>.</p>
+<div class="progress"><div class="progress-row"><span>Reindirizzamento</span><b id="progressText">0%</b></div><div class="bar"><div id="progressBar" class="bar-fill"></div></div></div>
+</div></main>
+<footer><p><span id="year"></span> <strong>ZetaCraft Hub</strong></p></footer>
+<script>
+document.getElementById('year').textContent = new Date().getFullYear();
+const DISCORD_URL = "https://discord.gg/YJp2vkaK34";
+let secondsLeft = 5, cancelled = false;
+const countdownEl = document.getElementById('countdown');
+const progressBar = document.getElementById('progressBar');
+const progressText = document.getElementById('progressText');
+function cancelRedirect(){
+  const btn = document.getElementById('cancelBtn');
+  const label = document.getElementById('cancelLabel');
+  if(!cancelled){
+    // ANNULLA: ferma tutto, nessun redirect
+    cancelled = true;
+    clearInterval(timer);
+    label.textContent = 'Riprendi reindirizzamento';
+    if(countdownEl) countdownEl.textContent = '—';
+    if(progressText) progressText.textContent = 'Annullato';
+    document.querySelector('.subtitle').textContent = 'REINDIRIZZAMENTO ANNULLATO';
+  } else {
+    // RIPRENDI: riparte da 5
+    cancelled = false;
+    secondsLeft = 5;
+    label.textContent = 'Annulla reindirizzamento';
+    if(progressBar) progressBar.style.width = '0%';
+    if(progressText) progressText.textContent = '0%';
+    document.querySelector('.subtitle').textContent = 'REINDIRIZZAMENTO IN CORSO';
+    startTimer();
+  }
+}
+let timer = null;
+function startTimer(){
+  clearInterval(timer);
+  timer = setInterval(() => {
+    if(cancelled){ clearInterval(timer); return; }
+    secondsLeft--;
+    const pct = Math.round(((5 - secondsLeft) / 5) * 100);
+    if(countdownEl) countdownEl.textContent = Math.max(secondsLeft, 0);
+    if(progressBar) progressBar.style.width = pct + '%';
+    if(progressText) progressText.textContent = pct + '%';
+    if(secondsLeft <= 0){ clearInterval(timer); window.location.href = DISCORD_URL; }
+  }, 1000);
+}
+startTimer();
+const card = document.getElementById('tiltCard');
+if(window.innerWidth > 768 && card){
+  document.addEventListener('mousemove', (e) => {
+    const xAxis = (window.innerWidth / 2 - e.pageX) / 45;
+    const yAxis = (window.innerHeight / 2 - e.pageY) / 45;
+    card.style.transform = 'rotateY(' + xAxis + 'deg) rotateX(' + yAxis + 'deg)';
+  });
+  document.addEventListener('mouseleave', () => { card.style.transform = 'rotateY(0deg) rotateX(0deg)'; });
+}
+</script>
+</body>
+</html>
